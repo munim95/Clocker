@@ -32,7 +32,7 @@ public class PieChartView extends View {
      *  - Automatically load apps/links pre set by user at specified times
      *  - EXTRA FEATURES (PAID) : Focus mode where phone functionality can be limited and cant be used until a set time (apart from calls etc)
      *  -New Pie Styles
-     * The sectors represent the time assigned respectively to the goals.
+     * The sectors represent the times assigned to the goals.
      * Total time of the sectors equals the total time in a day i.e 24hrs
      * Goals Clock - Sectors are greyed out as time progresses
      * Quadrant = 6 hrs (24hrs)/ 3 hrs (12hrs)
