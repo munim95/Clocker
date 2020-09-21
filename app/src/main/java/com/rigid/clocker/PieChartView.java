@@ -43,7 +43,7 @@ public class PieChartView extends View {
     private static final String TAG = PieChartView.class.getSimpleName();
     private final int CLOCK_HOUR_MODE =12; //12 or 24
     private final float TOTAL_SECONDS_IN_A_DAY = CLOCK_HOUR_MODE * 3600;
-    private final float CANVAS_ROTATION = -90;
+    private final float CANVAS_ROTATION = -90; //for convenience rotate the canvas by -90 as default has 360/0 degrees is at 90 degrees
 
     private int circleColor = DEFAULT_CIRCLE_COLOR;
     private RectF rectF;
@@ -61,7 +61,6 @@ public class PieChartView extends View {
 
     //touch events variables
     private float selectedSectorTotalAngle =0f;
-//    private float affectedAngle =0f;
     private float userStartAngle =0f;
     private Sector selectedSector;
     private int userStartQuadrant;
@@ -140,13 +139,15 @@ public class PieChartView extends View {
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
         //add text size to the left and top of rect to avoid it clipping at the edges
-        //figure out the max radius it can be, taking text in to account
-        //although getWidth and height will be the same, using math.min is just a precaution
-        float sectorAndStrokeWidth = sectorTextSize+strokeWidthArc;
+        //figure out the max radius it can be, taking text and stroke width(if appropriate) in to account
+        //although getWidth and height will be the same, using math.min is just a precaution and can be removed
+        float textAndStrokeWidth = sectorTextSize+strokeWidthArc;
         float max_radius = Math.min(w,h)- sectorAndStrokeWidth;
-        rectF = new RectF(sectorAndStrokeWidth, sectorAndStrokeWidth, max_radius, max_radius);
+        //contains the actual pie
+        rectF = new RectF(textAndStrokeWidth, textAndStrokeWidth, max_radius, max_radius);
+        //for the inner clock in pie
         float diameterPercentile = 0.10f; //0 - 1
-        float clockPosition = sectorAndStrokeWidth+((rectF.width())*diameterPercentile);
+        float clockPosition = textAndStrokeWidth+((rectF.width())*diameterPercentile);
         float clockRectSize=sectorTextSize+(rectF.width()*(1-diameterPercentile));
         clockRectF = new RectF(clockPosition,
                 clockPosition,
@@ -235,8 +236,7 @@ public class PieChartView extends View {
 
                 //ONLY IN EDIT MODE
                 if(isEditSectorMode) {
-                    //todo when a sector's total angle = 0, remove that sector upon users permission
-                    userStartAngle = cartesianToPolar(x, y)-CANVAS_ROTATION; //for +/- angles
+                    userStartAngle = cartesianToPolar(x, y)-CANVAS_ROTATION; //for determining +/- angles
                     userStartAngle=Math.min(360f,userStartAngle>360?userStartAngle-360:userStartAngle);
                     selectedSectorTotalAngle = getAngleForTimeInSeconds(selectedSector.getTotalTime(CLOCK_HOUR_MODE) * 60);
                     startBound =getAngleForTimeInSeconds(selectedSector.getStartTime()*60);
@@ -280,7 +280,7 @@ public class PieChartView extends View {
                     //suspend clock thread
                     float userCurrAngle = cartesianToPolar(x, y)-CANVAS_ROTATION;
                     userCurrAngle=Math.min(360f,userCurrAngle>360?userCurrAngle-360f:userCurrAngle);
-                    float dAngle = userCurrAngle - userStartAngle; // default behaviour - simply + if increasing or - otherwise
+                    float dAngle = userCurrAngle - userStartAngle; // default behaviour -> + if increasing or - if decreasing.
                     // angles will shift to 0 or 360 once over the start point for the pie so the following is to handle that...
                     // determined that it only happens when angle goes from 4th to 1st or 1st to 4th quadrants
                     int dQuadrant = getQuadrant(userCurrAngle) - userStartQuadrant;
@@ -328,19 +328,19 @@ public class PieChartView extends View {
                     } else {
                         selectedSector.setEndTime(newTime);
                         affectedSector.setStartTime(newTime);
-                    }// sector being changed
-                    //todo HAVE USER EXPLICITLY DELETE FROM SECTOR LIST. USER SHOULD NOT BE ABLE TO GO PAST SECTOR MIN TIME
-                    if(affectedSector.getTotalTime(CLOCK_HOUR_MODE)==0){
-                        Log.d(TAG,"SECTOR REMOVED: "+ affectedSector.getName());
-                        sectors.remove(affectedSector);
-//                        int in = sectors.indexOf(selectedSector);
-//                        index=startBound!=-1?
-//                                (in!=0?in-1:sectors.size()-1):
-//                                (in!=sectors.size()-1?in+1:0);
-                        requestLayout();
                     }
+                    //todo HAVE USER EXPLICITLY DELETE FROM SECTOR LIST. USER SHOULD NOT BE ABLE TO GO PAST SECTOR MIN TIME
+//                     if(affectedSector.getTotalTime(CLOCK_HOUR_MODE)==0){
+//                         Log.d(TAG,"SECTOR REMOVED: "+ affectedSector.getName());
+//                         sectors.remove(affectedSector);
+// //                        int in = sectors.indexOf(selectedSector);
+// //                        index=startBound!=-1?
+// //                                (in!=0?in-1:sectors.size()-1):
+// //                                (in!=sectors.size()-1?in+1:0);
+//                         requestLayout();
+//                     }
                     userStartQuadrant = getQuadrant(userCurrAngle);
-                    invalidate();
+                    invalidate(); //calls onDraw method (not immediately if it has other processes to handle first)
                 }
 
                 break;
