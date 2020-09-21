@@ -17,8 +17,7 @@ import java.util.Calendar;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-//Do It for your family and yourself
-//todo DEADLINE FOR COMPLETION - 30 September 2020
+
 public class PieChartView extends View {
     /**
      * This PieChart represents the goals of the user in an articulate manner.
