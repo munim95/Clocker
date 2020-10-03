@@ -4,7 +4,7 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-
+//represents a sector for the pie chart
 public class Sector {
     private String name;
     private int colour;

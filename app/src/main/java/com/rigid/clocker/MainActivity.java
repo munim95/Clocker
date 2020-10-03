@@ -10,10 +10,9 @@ import androidx.appcompat.app.AppCompatActivity;
  * goals and tasks.
  * Functionality will include (but is not limited to):
  * Be able to set goals
- * Be able to divide goals in to tasks
  * Constrain goals by time throughout the day
  * Handle completed/missed goals accordingly
- * Give user a feedback everyday on their productivity based on the goals they accomplished
+ * Give user a feedback everyday on their productivity based on the goals they accomplished (bonus feature?)
  * */
 public class MainActivity extends AppCompatActivity {
 
