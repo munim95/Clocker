@@ -6,7 +6,7 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RectF;
-import android.graphics.Region;
+import android.os.Build;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.MotionEvent;
@@ -17,7 +17,7 @@ import java.util.Calendar;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-//Do It for your family and yourself
+
 //todo DEADLINE FOR COMPLETION - 30 September 2020
 public class PieChartView extends View {
     /**
@@ -42,6 +42,7 @@ public class PieChartView extends View {
      */
     private static final int DEFAULT_CIRCLE_COLOR = Color.RED;
     private static final String TAG = PieChartView.class.getSimpleName();
+    private static final int SECTOR_TIME_LIMIT = 5;
     private final int CLOCK_HOUR_MODE =12; //12 or 24
     private final float TOTAL_SECONDS_IN_A_DAY = CLOCK_HOUR_MODE * 3600;
     private final float CANVAS_ROTATION = -90;
@@ -101,9 +102,19 @@ public class PieChartView extends View {
     }
     //returns total angle
     private void isPieFull(){
-        //to check if remaining pie needs to be filled or not with break
-            long lastEnd = sectors.get(sectors.size()-1).getEndTime(); //last sectors end = breaks start time, first sectors start = breaks end time
-            sectors.add(new Sector("Break",lastEnd,sectors.get(0).getStartTime(),Color.BLACK));
+        long total=0;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            total = sectors.stream().mapToLong(sector -> sector.getTotalTime(CLOCK_HOUR_MODE)).sum();
+        }else{
+            for(Sector s: sectors){
+                total+=s.getTotalTime(CLOCK_HOUR_MODE);
+            }
+        }
+        if(getAngleForTimeInSeconds(total)<360) {
+            //to check if remaining pie needs to be filled or not with break
+            long lastEnd = sectors.get(sectors.size() - 1).getEndTime(); //last sectors end = breaks start time, first sectors start = breaks end time
+            sectors.add(new Sector("Break", lastEnd, sectors.get(0).getStartTime(), Color.BLACK));
+        }
     }
 
     private void runClockThread() {
@@ -143,11 +154,11 @@ public class PieChartView extends View {
         //add text size to the left and top of rect to avoid it clipping at the edges
         //figure out the max radius it can be, taking text in to account
         //although getWidth and height will be the same, using math.min is just a precaution
-        float sectorAndStrokeWidth = sectorTextSize+strokeWidthArc;
-        float max_radius = Math.min(w,h)- sectorAndStrokeWidth;
-        rectF = new RectF(sectorAndStrokeWidth, sectorAndStrokeWidth, max_radius, max_radius);
+        float TextAndStrokeSize = sectorTextSize+strokeWidthArc;
+        float max_radius = Math.min(w,h)- TextAndStrokeSize;
+        rectF = new RectF(TextAndStrokeSize, TextAndStrokeSize, max_radius, max_radius);
         float diameterPercentile = 0.10f; //0 - 1
-        float clockPosition = sectorAndStrokeWidth+((rectF.width())*diameterPercentile);
+        float clockPosition = TextAndStrokeSize+((rectF.width())*diameterPercentile);
         float clockRectSize=sectorTextSize+(rectF.width()*(1-diameterPercentile));
         clockRectF = new RectF(clockPosition,
                 clockPosition,
@@ -204,7 +215,7 @@ public class PieChartView extends View {
             float a =cartesianToPolar(x,y)-CANVAS_ROTATION;
             a=a>360?a-360f:a;
             float angle = Math.round(a*10f)/10f; // to 1 dp
-            Log.d(TAG, "start "+startBound + " end " + endBound+" angle "+angle+" n "+ data.get(i).getName());
+//            Log.d(TAG, "start "+startBound + " end " + endBound+" angle "+angle+" n "+ data.get(i).getName());
 
             if(angle>=startBound &&
                     angle<=endBound){
@@ -222,8 +233,7 @@ public class PieChartView extends View {
         }
         return sector;
     }
-
-    //todo be able to change start and end times by dragging at each end of the sector
+    private long startTime,endTime;
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         //handles selecting sectors and editing their values
@@ -240,12 +250,14 @@ public class PieChartView extends View {
                     userStartAngle = cartesianToPolar(x, y)-CANVAS_ROTATION; //for +/- angles
                     userStartAngle=Math.min(360f,userStartAngle>360?userStartAngle-360:userStartAngle);
                     selectedSectorTotalAngle = getAngleForTimeInSeconds(selectedSector.getTotalTime(CLOCK_HOUR_MODE) * 60);
-                    startBound =getAngleForTimeInSeconds(selectedSector.getStartTime()*60);
-                    endBound=getAngleForTimeInSeconds(selectedSector.getEndTime()*60);
+                    startTime=selectedSector.getStartTime();
+                    endTime=selectedSector.getEndTime();
+                    startBound =getAngleForTimeInSeconds(startTime*60);
+                    endBound=getAngleForTimeInSeconds(endTime*60);
                     float middle = start_angle+(startBound +selectedSectorTotalAngle/2f);
 
                     //determine if its start or end bound thats changing
-                    if(endBound<startBound){ //handle the case where end bound ends up beyond 360
+                    if(endBound<startBound){ //handle the case where end bound ends up beyond 360 and find middle
                         if(middle<360) {
                             if (userStartAngle >= startBound && userStartAngle < middle)
                                 endBound = -1;
@@ -268,7 +280,7 @@ public class PieChartView extends View {
                     affectedSector_index = startBound!=-1?
                             (in!=0?in-1:sectors.size()-1):
                             (in!=sectors.size()-1?in+1:0);
-                    Log.d(TAG,"st "+startBound+" en "+endBound+" mid "+middle+" u "+userStartAngle);
+//                    Log.d(TAG,"st "+startBound+" en "+endBound+" mid "+middle+" u "+userStartAngle);
                     userStartQuadrant = getQuadrant(userStartAngle);
                     //reset these here...
                     switcher = -1;
@@ -281,14 +293,14 @@ public class PieChartView extends View {
                     //suspend clock thread
                     float userCurrAngle = cartesianToPolar(x, y)-CANVAS_ROTATION;
                     userCurrAngle=Math.min(360f,userCurrAngle>360?userCurrAngle-360f:userCurrAngle);
-                    float dAngle = userCurrAngle - userStartAngle; // default behaviour - simply + if increasing or - otherwise
-                    // angles will shift to 0 or 360 once over the start point for the pie so the following is to handle that...
-                    // determined that it only happens when angle goes from 4th to 1st or 1st to 4th quadrants
+                    float dAngle = userCurrAngle - userStartAngle; // how much angle has moved from start. Default behaviour - simply + if increasing or - otherwise
+
+                    // angles will shift to 0 or 360 from 4th to 1st or 1st to 4th quadrants
                     int dQuadrant = getQuadrant(userCurrAngle) - userStartQuadrant;
-                    //switch set true or false
-                    //when one is true the other is off until the whole event is cancelled (ACTION_UP)
+
+                    //when one is true the other is off for one whole event (ACTION_DOWN to ACTION_MOVE to ACTION_UP)
                     if (dQuadrant == -3) { // 4th to 1st quadrant (1-4)
-                        if (switcher == 3 || switcher == -1) { // if set previously set=false as its gone back to normal state
+                        if (switcher == 3 || switcher == -1) { // if set previously or first time set=false as its gone back to normal state
                             if (set) {
                                 set = false; // switch off
                                 switcher = -1;
@@ -308,7 +320,7 @@ public class PieChartView extends View {
                             }
                         }
                     }
-                    //handle according to the direction of cursor
+                    //handle according to the changes in quadrant
                     if (set) {
                         if (switcher == -3) {
                             dAngle = (360 + userCurrAngle) - userStartAngle;
@@ -318,30 +330,53 @@ public class PieChartView extends View {
                     }
                     float newAngle=(startBound!=-1?startBound:endBound) + dAngle;
                     newAngle=newAngle<0f?360f+newAngle:newAngle>360f?newAngle-360f:newAngle;
-//                    float newAngleA=affectedAngle + dAngle;
                     Sector affectedSector = sectors.get(affectedSector_index);
                     int newTime=getTimeForAngleInDegrees(Math.min(360, Math.max(0, newAngle))) / 60;
-                    Log.d(TAG,"d angle "+newAngle+" time "+newTime);
-                    if (startBound != -1) { //start time is being changed
-                        selectedSector.setStartTime(newTime);
-                        affectedSector.setEndTime(newTime);
 
+                    //Here we handled sectors limitations also handling cases where sector fell in the 'isNotNormal' state-
+                    // i.e either endTime < startTime OR affected sectors values greater or lesser than the selected sector
+                    boolean isNotNormal = startBound!=-1?
+                            endTime < affectedSector.getStartTime():
+                            startTime > affectedSector.getEndTime(); // for start bound selected sector normally should have values greater than its affected sector
+                    long minEndTime = startBound!=-1?
+                            isNotNormal && newTime > endTime ? endTime + (CLOCK_HOUR_MODE * 60) : endTime - SECTOR_TIME_LIMIT:
+                            isNotNormal && newTime < startTime ? 0 : startTime + SECTOR_TIME_LIMIT;
+                    boolean isPartNormal = startBound!=-1?
+                            newTime < endTime && isNotNormal:
+                            newTime > startTime && isNotNormal; //start time < end time as normal however still isNotNormal
+                    boolean limiter = startBound!=-1?
+                            newTime<=minEndTime && (isPartNormal?
+                            newTime<=affectedSector.getStartTime()+SECTOR_TIME_LIMIT : newTime>=affectedSector.getStartTime()+SECTOR_TIME_LIMIT) :
+                            newTime>=minEndTime && (isPartNormal?
+                                    newTime>=affectedSector.getEndTime()-SECTOR_TIME_LIMIT : newTime<=affectedSector.getEndTime()-SECTOR_TIME_LIMIT);
+
+                    if (startBound != -1) { //start time is being changed
+                        //here newtime is start time
+                        if(limiter) {
+                            selectedSector.setStartTime(newTime);
+                            affectedSector.setEndTime(newTime); //prev sector
+                        }
                     } else {
-                        selectedSector.setEndTime(newTime);
-                        affectedSector.setStartTime(newTime);
+                        //here newtime is end time
+                        if(limiter) {
+                            selectedSector.setEndTime(newTime);
+                            affectedSector.setStartTime(newTime); //next sector
+                        }
                     }// sector being changed
-                    //todo HAVE USER EXPLICITLY DELETE FROM SECTOR LIST. USER SHOULD NOT BE ABLE TO GO PAST SECTOR MIN TIME
-                    if(affectedSector.getTotalTime(CLOCK_HOUR_MODE)==0){
-                        Log.d(TAG,"SECTOR REMOVED: "+ affectedSector.getName());
-                        sectors.remove(affectedSector);
-//                        int in = sectors.indexOf(selectedSector);
-//                        index=startBound!=-1?
-//                                (in!=0?in-1:sectors.size()-1):
-//                                (in!=sectors.size()-1?in+1:0);
-                        requestLayout();
-                    }
                     userStartQuadrant = getQuadrant(userCurrAngle);
                     invalidate();
+
+                    //todo HAVE USER EXPLICITLY DELETE FROM SECTOR LIST. USER SHOULD NOT BE ABLE TO GO PAST SECTOR MIN TIME
+//                    if(affectedSector.getTotalTime(CLOCK_HOUR_MODE)==0){
+//                        Log.d(TAG,"SECTOR REMOVED: "+ affectedSector.getName());
+//                        sectors.remove(affectedSector);
+////                        int in = sectors.indexOf(selectedSector);
+////                        index=startBound!=-1?
+////                                (in!=0?in-1:sectors.size()-1):
+////                                (in!=sectors.size()-1?in+1:0);
+//                        requestLayout();
+//                    }
+
                 }
 
                 break;
@@ -399,15 +434,15 @@ public class PieChartView extends View {
             canvas.drawTextOnPath((i==0? CLOCK_HOUR_MODE :(CLOCK_HOUR_MODE -(CLOCK_HOUR_MODE -i)))+"", clockNumbersPath,0f,-strokeWidthArc,paint);
             startTimeAngle+=sweepAngle;
         }
-//        paint.setStyle(Paint.Style.STROKE);
-//        paint.setStrokeWidth(strokeWidthArc);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(strokeWidthArc);
 //        canvas.clipOutRect(clockRectF);
         //lay down the chart sectors
 //        float[] time_angles = new float[t.length];
         for(Sector s: sectors){
             float sweep_angle = getAngleForTimeInSeconds(s.getTotalTime(CLOCK_HOUR_MODE)*60);
             paint.setColor(s.getColour());
-            canvas.drawArc(rectF, start_angle+getAngleForTimeInSeconds(s.getStartTime()*60), sweep_angle, true, paint);
+            canvas.drawArc(rectF, start_angle+getAngleForTimeInSeconds(s.getStartTime()*60), sweep_angle, false, paint);
 //            Log.d(TAG,"sectors "+s.getName()+" "+(start_angle+getAngleForTimeInSeconds(s.getStartTime()*60))+" "+(sweep_angle));
         }
         if(clockEnabled) {
@@ -418,8 +453,8 @@ public class PieChartView extends View {
             //1. this path will draw current time always
             currentTimePath.rewind();
             currentTimePath.moveTo(rectF.centerX(),rectF.centerY());
-            currentTimePath.lineTo(rectF.centerX()+(float) (radius*Math.cos(Math.toRadians(sweep_time_angle))),
-                    rectF.centerY()+(float)(radius*Math.sin(Math.toRadians(sweep_time_angle))));
+            float[] xy = polarToCartesian(rectF.centerX(),rectF.centerY(),radius,sweep_time_angle);
+            currentTimePath.lineTo(xy[0], xy[1]);
             currentTimePath.close();
             paint.setAlpha(getPaintAlpha(1f));
             paint.setStyle(Paint.Style.STROKE);

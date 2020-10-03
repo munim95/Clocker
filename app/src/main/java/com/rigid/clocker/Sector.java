@@ -17,15 +17,18 @@ public class Sector {
         this.colour=colour;
     }
     public long getTotalTime(int ClockMode){
-        if(endTime<startTime) { // end gone beyond 12/24 hrs
-            return (ClockMode*60+endTime) - startTime;
-        }
-        return endTime-startTime;
+        return getCorrectedEndTime(ClockMode)-startTime;
     }
     public long getStartTime(){
         return startTime;
     }
     public long getEndTime(){
+        return endTime;
+    }
+    public long getCorrectedEndTime(int ClockMode){
+        if(endTime<startTime) { // end gone beyond 12/24 hrs
+            return (ClockMode * 60 + endTime);
+        }
         return endTime;
     }
     public String getName(){return name;}
