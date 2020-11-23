@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Clocker</string>
+    <string name="hexString">#%s</string>
+    <string name="hextitle">HEX</string>
+</resources>

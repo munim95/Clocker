@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <PreferenceCategory  android:title="Clock">
+        <DropDownPreference
+            android:key="clockmode"
+            android:summary="Set the time hour mode"
+            android:entries="@array/clockmodes"
+            android:entryValues="@array/clockmodesvalues"/>
+        <DropDownPreference
+            android:key="datemode"
+            android:summary="Set preferred date format"
+            android:entries="@array/dateformats"
+            android:entryValues="@array/dateformatsvalues"/>
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="Notifications">
+        <SwitchPreference
+            android:key="notifications"
+            android:title="Enable Notifications" />
+        <SwitchPreference
+            android:key="wakelock"
+            android:enabled="false"
+            android:title="Wake Device"
+            android:summaryOff="Turn on screen for alerts"/>
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="Other">
+        <Preference android:title="Report Bugs"
+            android:summary="Report information about the issue"/>
+
+        <Preference android:title="About"
+            android:summary="Developer Info, Donate"/>
+
+    </PreferenceCategory>
+</PreferenceScreen>

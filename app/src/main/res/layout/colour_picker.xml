@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <LinearLayout
+        android:id="@+id/colourDisplayLayout"
+        android:layout_width="match_parent"
+        android:layout_height="200dp"
+        android:orientation="horizontal"
+        android:layout_marginStart="5dp"
+        android:layout_marginEnd="5dp"
+        android:layout_alignParentTop="true">
+
+        <com.rigid.clocker.colourpicker.HueDisplaySurface
+            android:id="@+id/huedisplay"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/picker_mask"
+            android:layout_weight="0.3"/>
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="100dp"
+            android:background="@drawable/border"
+            android:layout_weight="0.7">
+            <com.rigid.clocker.colourpicker.UserColourPreview
+                android:id="@+id/colourpreview"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_margin="1dp"/>
+        </FrameLayout>
+
+    </LinearLayout>
+    <com.rigid.clocker.colourpicker.HueSlider
+        android:id="@+id/hueslider"
+        android:layout_width="match_parent"
+        android:layout_height="20dp"
+        android:layout_marginTop="20dp"
+        android:layout_marginStart="5dp"
+        android:layout_marginEnd="5dp"
+        android:layout_below="@+id/colourDisplayLayout"/>
+
+    <LinearLayout
+        android:id="@+id/hexholder"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginTop="20dp"
+        android:layout_marginStart="5dp"
+        android:layout_marginEnd="5dp"
+        android:layout_below="@+id/hueslider">
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/hextitle"
+            android:padding="1dp"
+            android:gravity="center" />
+        <EditText
+            android:id="@+id/hexvaluetext"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxLength="7"
+            android:background="@drawable/blank"
+            android:gravity="center"/>
+    </LinearLayout>
+
+</RelativeLayout>

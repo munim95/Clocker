@@ -8,7 +8,9 @@ import androidx.annotation.Nullable;
 public class Sector {
     private String name;
     private int colour;
+    private int groupId;
     private long startTime,endTime;
+    private boolean isExpanded;
 
     public Sector(String name, long startTime, long endTime,int colour){
         this.name=name;
@@ -44,6 +46,18 @@ public class Sector {
 
     public void setEndTime(long endTime) {
         this.endTime = endTime;
+    }
+    public void setExpanded(boolean expanded){
+        this.isExpanded = expanded;
+    }
+    public boolean isExpanded(){
+        return isExpanded;
+    }
+    public void setGroupId(int groupId){
+        this.groupId=groupId;
+    }
+    public int getGroupId(){
+        return groupId;
     }
 
     @Override

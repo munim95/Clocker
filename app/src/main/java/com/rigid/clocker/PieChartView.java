@@ -1,38 +1,55 @@
 package com.rigid.clocker;
 
+import android.animation.ValueAnimator;
 import android.content.Context;
+import android.content.SharedPreferences;
+import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
+import android.graphics.PathMeasure;
+import android.graphics.Rect;
 import android.graphics.RectF;
+import android.graphics.drawable.BitmapDrawable;
 import android.os.Build;
+import android.text.TextPaint;
+import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 
+import androidx.annotation.IntDef;
+import androidx.preference.PreferenceManager;
+
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.concurrent.Executors;
+import java.util.Locale;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
-//todo DEADLINE FOR COMPLETION - 30 September 2020
 public class PieChartView extends View {
     /**
      * This PieChart represents the goals of the user in an articulate manner.
      * todo - CLicking on a sector should expand the details of the goal
-     *  - User should be given a limit on how many goals they can add with regards to time (min time for each)
-     *    this will ensure that the 24hr limit is never crossed for a day
-     *  - Data will include times, colours, names given to goals
-     *  - User should be able to change the sector times by dragging the arcs in 'edit mode'
-     *  - Highlight only the segment that is active - include as a customizable option
      *   - Strict Mode where users data (productivity) is compared with other users globally
      *   - CLock will be available as a widget
      *  - Automatically load apps/links pre set by user at specified times
-     *  - EXTRA FEATURES (PAID) : Focus mode where phone functionality can be limited and cant be used until a set time (apart from calls etc)
-     *  -New Pie Styles
+     *  - Goals change depending on location. E.g if at office display office tasks, home display home chores etc
+     *  - EXTRA FEATURES (PAID) :
+     *  (These features can be displayed at different intervals set by user to respect space.
+     *   User should always be made aware of increase in battery consumption )
+     *  - Alarms
+     *  - New Pie Styles
+     *  - Cursor Styles - Sun to moon transition
+     *  - Display Weather - bg can have weather related theme
+     *  - More Edit options
+     *  - Miles walked display
+     *  - music playing display
+     *  - transport display (departure/arrival)
+     *  - Focus mode where phone functionality can be limited and cant be used until a set time (apart from calls etc)
      * The sectors represent the time assigned respectively to the goals.
      * Total time of the sectors equals the total time in a day i.e 24hrs
      * Goals Clock - Sectors are greyed out as time progresses
@@ -40,25 +57,28 @@ public class PieChartView extends View {
      * Customizable PieChart - User can determine sectors colours, add an image to a sector (clipped in), enable/disable Goals Clock...
      * *
      */
-    private static final int DEFAULT_CIRCLE_COLOR = Color.RED;
+    private SharedPreferences sharedPreferences;
     private static final String TAG = PieChartView.class.getSimpleName();
-    private static final int SECTOR_TIME_LIMIT = 5;
-    private final int CLOCK_HOUR_MODE =12; //12 or 24
-    private final float TOTAL_SECONDS_IN_A_DAY = CLOCK_HOUR_MODE * 3600;
+    private int CLOCK_HOUR_MODE ; //12 or 24
+    private float TOTAL_SECONDS_IN_A_DAY ;
     private final float CANVAS_ROTATION = -90;
+    private final int MIN_SECTOR_TIME = 5;
 
-    private int circleColor = DEFAULT_CIRCLE_COLOR;
-    private RectF rectF;
+    private RectF mainBGRectF, clockBorderRectF;
     private Paint paint;
+    private Paint clockDetailsPaint;
 
     float curr_sector_angle = 0f;
     int curr_sector = 0;
     boolean chart_dirty = true;
-    private float sectorTextSize=40f; //default
+    private float sectorNumbersTextSize =40f,
+            strokeWidthArc,
+            clockTextSize; //default
+    private Path interiorCircle;
     float start_angle = 0f;
     private float totalUserAngle; //default
 
-    private ScheduledExecutorService mExecutor;
+    private ScheduledExecutorService mClockExecutor;
     private long elapsed_time = 0;
 
     //touch events variables
@@ -69,36 +89,63 @@ public class PieChartView extends View {
     private int userStartQuadrant;
     private int switcher=-1;
     private boolean set=false;
-    private boolean isEditSectorMode=true,
-            clockEnabled=true; //when in edit sector mode
-    private float startBound=-1,endBound=-1;
+    private boolean isEditSectorMode=false,
+            clockEnabled=true,
+            stampsEnabled = true,
+            clockNumbersEnabled = false;
+    private float startBoundAngle =-1, endBoundAngle =-1;
     private int affectedSector_index;
     private ArrayList<Sector> sectors;
     private boolean AmOrPm;
     private Path clockNumbersPath = new Path();
     private Path currentTimePath = new Path();
+    private long startTime,endTime;
+    private float hourGapAngle ; //1hr gap
+    private Sector currSector=null;
+    private float currentSectorEndAngle =0;
+    private boolean checkCurrentSector =false;
+    private int clockAlignmentPresets = ClockTextAlignment.CENTER;
+    private int datePresets = DateStylePresets.RIGHT_P3;
+    private float animatedAlphaValue =1;
+    private ValueAnimator alphaValueAnimator;
+    private Thread clockerTimeThread;
+    private Calendar calendar;
+
+
+    /* Colours */
+    int bgColour = Color.argb(getRGBAlpha(0.3f),255,255,255); //test colours--users default preferences go here
+    int topColour = Color.BLACK;
+
+    private boolean isEditing =false;
 
     public PieChartView(Context context) {
         super(context);
         init(context, null);
     }
 
+    /* not used */
     public PieChartView(Context context, AttributeSet attrs) {
         super(context, attrs);
         init(context, attrs);
     }
 
     private void init(Context context, AttributeSet attrs) {
+        sharedPreferences = PreferenceManager.getDefaultSharedPreferences(context);
+        CLOCK_HOUR_MODE = Integer.parseInt(sharedPreferences.getString("clockmode","12"));
+        Log.d(TAG,"MODE "+CLOCK_HOUR_MODE);
+        TOTAL_SECONDS_IN_A_DAY=CLOCK_HOUR_MODE * 3600;
+        hourGapAngle= getAngleForTimeInSeconds(60*60);
+        calendar=Calendar.getInstance();
         sectors= new ArrayList<>();
         //todo minimum total time = 5 mins
         sectors.add(new Sector("Bla1",60,120,Color.RED));//1-2
         sectors.add(new Sector("Bla2",120,240,Color.BLUE));//2-4
         sectors.add(new Sector("Bla3",240,300,Color.GREEN));//4-5
-        sectors.add(new Sector("Bla4",300,420,Color.GRAY));//5-7
+        sectors.add(new Sector("Bla4",300,337,Color.GRAY));//5-7
+//        sectors.add(new Sector("Bla5",420,1080,Color.CYAN));//7-18 (24 only test)
 
         isPieFull();
-        if(clockEnabled)
-            runClockThread();
+
     }
     //returns total angle
     private void isPieFull(){
@@ -117,125 +164,471 @@ public class PieChartView extends View {
         }
     }
 
-    private void runClockThread() {
-        if (mExecutor == null)
-            mExecutor = Executors.newSingleThreadScheduledExecutor();
-        mExecutor.scheduleWithFixedDelay(() -> {
-            try {
-                elapsed_time = getCurrentTime(CLOCK_HOUR_MODE);
-                //todo start time = start time of first goal, endtime = end time of last goal
-                AmOrPm = getCurrentTime(24)<12;
+    private String hourText, minuteText;
+    //decided to make this public to use in both in widget provider and here
+    public long updateTime(){
+        /*TEST*/
+        elapsed_time+=600;
+        if(elapsed_time>=CLOCK_HOUR_MODE*3600)
+            elapsed_time=0;
 
-                postInvalidate();
-//                Log.d("PieChartView", "elapsed " + elapsed_time);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }, 0, 1000, TimeUnit.MILLISECONDS);
+//        elapsed_time = getCurrentTime(CLOCK_HOUR_MODE);
+//        AmOrPm = (CLOCK_HOUR_MODE!=24?getCurrentTime(24):elapsed_time) < 12;
+        int[] s = Helpers.timeConversion(elapsed_time);
+        hourText = s[0] < 10 ? "0" + s[0] : s[0] + "";
+        minuteText = s[1] < 10 ? "0" + s[1] : s[1]+"";
+        return elapsed_time;
     }
-    private long getCurrentTime(int mode){
-        Calendar rightNow = Calendar.getInstance();
+    public void runClockThread() {
+        if(clockEnabled) {
+            if(clockerTimeThread ==null||!clockerTimeThread.isAlive()) {
+                clockerTimeThread =new Thread(()-> {
+                    while (true) {
+                        updateTime();
+                        postInvalidate();
+                        try{
+                            /* TEST - 1 ms*/
+                            Thread.sleep(100); //call at intervals of one second
+                        }catch (InterruptedException e){
+                            break;
+                        }
+                    }
+                    Log.i(TAG,Thread.currentThread().getName()+ " has been terminated.");
+                },"ClockerActivityThread");
+                clockerTimeThread.start();
+            }
+        }
+    }
+    private long getCurrentTime(int hourMode){
         // offset to add since we're not UTC
-        long offset = rightNow.get(Calendar.ZONE_OFFSET) +
-                rightNow.get(Calendar.DST_OFFSET);
-        long sinceMidnight = (rightNow.getTimeInMillis() + offset) %
-                (mode * 60 * 60 * 1000);
+        long offset = calendar.get(Calendar.ZONE_OFFSET) +
+                calendar.get(Calendar.DST_OFFSET);
+        long sinceMidnight = (calendar.getTimeInMillis() + offset) %
+                (hourMode * 60 * 60 * 1000);
         return sinceMidnight / 1000;
     }
-    public void setCircleColor(int circleColor) {
-        this.circleColor = circleColor;
-        invalidate();
-    }
-    private RectF clockRectF= new RectF();
-    private float strokeWidthArc = 20f;
+
+    private float outerToInnerGap,dateSize;
+    private Path timeCursor = new Path();
+    private float[] clockXY;
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
         //add text size to the left and top of rect to avoid it clipping at the edges
         //figure out the max radius it can be, taking text in to account
         //although getWidth and height will be the same, using math.min is just a precaution
-        float TextAndStrokeSize = sectorTextSize+strokeWidthArc;
-        float max_radius = Math.min(w,h)- TextAndStrokeSize;
-        rectF = new RectF(TextAndStrokeSize, TextAndStrokeSize, max_radius, max_radius);
-        float diameterPercentile = 0.10f; //0 - 1
-        float clockPosition = TextAndStrokeSize+((rectF.width())*diameterPercentile);
-        float clockRectSize=sectorTextSize+(rectF.width()*(1-diameterPercentile));
-        clockRectF = new RectF(clockPosition,
-                clockPosition,
-                clockRectSize,
-                clockRectSize);
+        float textAndStrokeSize = strokeWidthArc=(Math.round(0.01f*w));
+        float rectRightBottom = Math.min(w,h)- textAndStrokeSize*2;
+        mainBGRectF = new RectF(textAndStrokeSize*2, textAndStrokeSize*2, rectRightBottom, rectRightBottom);
+        float radius=(mainBGRectF.width()/2f);
+        clockTextSize = 0.4f*radius; // to keep text in proportion
+
         paint = new Paint();
-//        Path path = new Path();
-//        PathMeasure pathMeasure = new PathMeasure(path,true);
-//        Path path1 = new Path();
-//        path1.addCircle(0f,0f,8f, Path.Direction.CW);
-//        pathEffect= new PathDashPathEffect(path1,pathMeasure.getLength(),pathMeasure.getLength()*0.5f, PathDashPathEffect.Style.TRANSLATE);
-//        pathEffect = new DashPathEffect(new float[]{20,0,0,0},10f);
-//        paint.setPathEffect(pathEffect);
-//        paint.setColor(Color.RED);
-//        paint.setStyle(Paint.Style.STROKE);
-//        paint.setStrokeWidth(20f);
-    }
-//    Path p = new Path();
-    protected void onDraw(Canvas canvas) {
-        super.onDraw(canvas);
-//        p.rewind();
-//        p.addArc(clockRectF,0,360);
-//        canvas.clipPath(p, Region.Op.DIFFERENCE);
-        makePie(sectors, canvas, rectF);
-//        Paint p = new Paint();
-//        p.setColor(Color.WHITE);
-//        canvas.drawArc(clockRectF,0f,360f,true,p);
+        paint.setAntiAlias(true);
+        clockDetailsPaint=new Paint();
+        clockDetailsPaint.setAntiAlias(true);
 
-//        canvas.drawCircle(rectF.centerX(),rectF.centerY(),rectF.width()*0.25f,p);
-        //for the PathDashEffect and PathDashPathEffect use 2 seperate loops
-//        canvas.drawPath(createPath(path,4, getWidth()*0.5f),paint);
-    }
+        paint.setTextSize(clockTextSize);
+        paint.getTextBounds(hourText,0,hourText.length(), clockTextMeasure); //height of the hour text
+        maxTextHeight=clockTextMeasure.height();
+        clockDigitWidth = paint.measureText(hourText)*.5f;
+        //alignment coords
+        //radius = bg radius - length of the 1 hr arc in 12 hr or 2 hr arc in 24hr
+        outerToInnerGap =(0.05f*radius);
+        radiusOfHourDot = .5f*outerToInnerGap;
+        float length = getArcLengthForTime(mainBGRectF.width()/2f,60*60);
+        dateSize =
+//                maxTextHeight*.65f
+        clockDigitWidth*.4f;
+        if(clockAlignmentPresets !=ClockTextAlignment.CENTER) {
+            //apply if preset:
+            //right && !p1
+            //top && !p2
+            //left && !p3
+            //bottom && !p4
+            if(clockAlignmentPresets==ClockTextAlignment.RIGHT && datePresets!=DateStylePresets.LEFT_P1 ||
+            clockAlignmentPresets==ClockTextAlignment.TOP && datePresets!=DateStylePresets.BOTTOM_P2 ||
+            clockAlignmentPresets==ClockTextAlignment.LEFT && datePresets!=DateStylePresets.RIGHT_P3 ||
+            clockAlignmentPresets==ClockTextAlignment.BOTTOM && datePresets!=DateStylePresets.TOP_P4) {
+                Rect tRect = new Rect();
+                paint.setTextSize(dateSize);
+                paint.getTextBounds("S", 0, 1, tRect);
+                float size = tRect.height();
+                paint.setTextSize((6 / 11f) * dateSize);
+                paint.getTextBounds("0", 0, 1, tRect);
+                size += tRect.height();
 
-    public int getCircleColor() {
-        return circleColor;
-    }
-    @Override
-    protected void onAttachedToWindow() {
-        super.onAttachedToWindow();
-    }
-
-    private void setSectorTextSize(float size){
-        sectorTextSize =size;
-    }
-
-    private void enableText(boolean enable){}
-
-    private Sector findSectorForXY(float x, float y, ArrayList<Sector> data){
-        //check the sector bounds the angle falls in
-        Sector sector = null;
-        for (int i=0; i<data.size() ; i++) {
-            float startBound = getAngleForTimeInSeconds(data.get(i).getStartTime()*60),
-                    endBound = getAngleForTimeInSeconds(data.get(i).getEndTime()*60);
-            float a =cartesianToPolar(x,y)-CANVAS_ROTATION;
-            a=a>360?a-360f:a;
-            float angle = Math.round(a*10f)/10f; // to 1 dp
-//            Log.d(TAG, "start "+startBound + " end " + endBound+" angle "+angle+" n "+ data.get(i).getName());
-
-            if(angle>=startBound &&
-                    angle<=endBound){
-                sector= data.get(i);
-//                Log.d(TAG,"normal "+data.get(i).getName());
-                break;
+                length = length + size;
             }
-            //check if a sector lies in the 'special' area - end is lesser than start
-            if(endBound-startBound<0){
-                if(angle>=startBound || angle<=endBound){
-                    sector= data.get(i);
-//                    Log.d(TAG,"special "+data.get(i).getName());
+        }
+
+        clockXY = polarToCartesian(mainBGRectF.centerX(),mainBGRectF.centerY(),
+                clockAlignmentPresets !=ClockTextAlignment.CENTER?
+                        mainBGRectF.width()/2f- length:
+                        0, clockAlignmentPresets != ClockTextAlignment.CENTER ? clockAlignmentPresets :0);
+
+        if(stampsEnabled) {
+             //gap b/w outer and inner circle
+            //create the quarterly stamp
+            interiorCircle = new Path();
+            Path pathStamp = new Path();
+
+            //reason for opting for manual over pathDashPathEffect -
+            // 1. draw called unnecessarily for stamps where not needed and no way to tweak that
+            // 2. subsequently that also results in better performance
+            float startTimeAngle = 0f;
+            float tenMinutely = hourGapAngle/6; //divide in to six points between hours representing 10 min
+            for (int i = 0; i < CLOCK_HOUR_MODE*6; i++) { //total dots = 24hrs - 144, 12hrs - 72
+                float[] xy = polarToCartesian(mainBGRectF.centerX(), mainBGRectF.centerY(),
+                        radius - outerToInnerGap,startTimeAngle);
+                boolean isQuarterly = startTimeAngle%90==0,
+                isHourly = startTimeAngle%hourGapAngle==0,
+                isTenMinutely = startTimeAngle%tenMinutely==0;
+                if(isQuarterly) { //quarterly
+                    pathStamp.reset();
+                    pathStamp.addCircle(0, 0, outerToInnerGap/2f, Path.Direction.CW);
+                    interiorCircle.addPath(pathStamp,xy[0],xy[1]);
+                }
+                if(!isQuarterly && isHourly){ //hourly
+                    pathStamp.reset();
+                    pathStamp.addCircle(0, 0, outerToInnerGap/4f, Path.Direction.CW);
+                    interiorCircle.addPath(pathStamp,xy[0],xy[1]);
+                }
+                if(!isQuarterly && !isHourly && isTenMinutely){
+                    pathStamp.reset();
+                    pathStamp.addCircle(0, 0, outerToInnerGap/8f, Path.Direction.CW);
+                    interiorCircle.addPath(pathStamp,xy[0],xy[1]);
+                }
+                startTimeAngle += tenMinutely;
+            }
+        }
+        timeCursor = createPath(new Path(),3,strokeWidthArc*2,0,0);
+        /*
+         * We moved all the elements that do not change after drawn from the onDraw here to avoid unnecessary draw calls
+         * Sectors will only be drawn again in edit mode
+         * */
+        initStaticChartElements(mainBGRectF, sectors,dateSize);
+    }
+    private float getArcLengthForTime(float radius, int seconds){
+        return (float) (getAngleForTimeInSeconds(CLOCK_HOUR_MODE/12*seconds)/360f * (2*Math.PI*(radius)));
+    }
+    private float radiusOfHourDot;
+    private void initStaticChartElements(RectF rectF, ArrayList<Sector> sectors, float dateSize){
+        Bitmap bitmap = Bitmap.createBitmap(getWidth(),getHeight(),Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        canvas.save();
+        canvas.rotate(CANVAS_ROTATION,rectF.centerX(),rectF.centerY()); // 0 degrees on top instead of at 90 degrees
+        Paint paint = new Paint();
+        //        setLayerType(LAYER_TYPE_HARDWARE,paint); // look in to this if rendering slow on min API version
+        paint.setStyle(Paint.Style.FILL);
+//        paint.setStrokeWidth(strokeWidthArc/4);
+//        paint.setColor(Color.argb(getRGBAlpha(0.3f),255,255,255));
+        paint.setColor(bgColour);
+        /* BG circle */
+        //we are adding stroke width to radius so that the arc edges don't blend in with the wallpaper
+        canvas.drawCircle(rectF.centerX(),rectF.centerY(),rectF.width()/2f+strokeWidthArc,paint);
+        /*----lay down the clock numbers----*/
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(topColour);
+        paint.setAlpha(getRGBAlpha(1f));
+        if(clockNumbersEnabled) {
+//        sectorClockRadius *= 1; // 0 being centered, 1 being on the arc edges.
+            paint.setTextSize(sectorNumbersTextSize);
+            paint.setTextAlign(Paint.Align.CENTER); //defaults to left
+            float startTimeAngle = 0f;
+            for (int i = 0; i < CLOCK_HOUR_MODE; i++) {
+                clockNumbersPath.rewind();
+                //a way to center numbers in their exact locations is to make the number's start angle the previous start angle and making the hour gap to 2 hours
+                clockNumbersPath.addArc(rectF, startTimeAngle - hourGapAngle < 0 ? 360f - hourGapAngle : startTimeAngle - hourGapAngle, hourGapAngle * 2); //- offset the text in the middle of the angles
+                canvas.drawTextOnPath((i == 0 ? CLOCK_HOUR_MODE!=24?CLOCK_HOUR_MODE:"00" : (CLOCK_HOUR_MODE - (CLOCK_HOUR_MODE - i))) + "", clockNumbersPath, 0f, sectorNumbersTextSize, paint);
+                startTimeAngle += hourGapAngle;
+            }
+        }/*----PATH STAMPS----*/
+        else if(stampsEnabled) {
+            canvas.drawPath(interiorCircle,paint);
+        }
+        //lay down the chart sectors
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(strokeWidthArc);
+        for(Sector s: sectors){
+            float sweep_angle = getAngleForTimeInSeconds(s.getTotalTime(CLOCK_HOUR_MODE)*60);
+            paint.setColor(s.getColour());
+            paint.setAlpha(getRGBAlpha(0.2f));
+            canvas.drawArc(rectF, start_angle+getAngleForTimeInSeconds(s.getStartTime()*60), sweep_angle, false, paint);
+//            Log.d(TAG,"sectors "+s.getName()+" "+(start_angle+getAngleForTimeInSeconds(s.getStartTime()*60))+" "+(sweep_angle));
+        }
+        canvas.restore();
+        /*------------ DATE PRESETS ----------------*/
+        /* PRESET 1 - Left Align */
+        //use textsizeforwidth if we dont want gaps but still want to fit
+//                dateSize = getTextSizeForWidth(paint,maxTextHeight*2,"Sunday",clockTextSize);
+        //max for matching width without chars intersecting - 65% of half the desired width, anything higher results in intersection/not appealing
+        String day = calendar.getDisplayName(Calendar.DAY_OF_WEEK, Calendar.LONG, Locale.getDefault());
+        String date = calendar.get(Calendar.DATE)+" "+calendar.getDisplayName(Calendar.MONTH,Calendar.SHORT,Locale.getDefault())+" "+calendar.get(Calendar.YEAR);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(topColour);
+        paint.setTextSize(dateSize);
+        Rect dayRect = new Rect();
+        paint.getTextBounds(day,0,day.length(),dayRect);
+        float x =datePresets==DateStylePresets.LEFT_P1 ?
+                clockXY[0]-(clockDigitWidth +radiusOfHourDot):
+                datePresets==DateStylePresets.BOTTOM_P2 || datePresets==DateStylePresets.TOP_P4 ?
+                clockXY[0]-clockDigitWidth:
+                datePresets==DateStylePresets.RIGHT_P3 ?
+                clockXY[0]+clockDigitWidth+radiusOfHourDot:
+                        0;
+
+        float y = datePresets==DateStylePresets.LEFT_P1 ? clockXY[1]+maxTextHeight+radiusOfHourDot:
+                datePresets==DateStylePresets.BOTTOM_P2 ?clockXY[1]+maxTextHeight+radiusOfHourDot*2+dayRect.height():
+                        datePresets==DateStylePresets.RIGHT_P3 ?clockXY[1]-maxTextHeight:
+                                datePresets==DateStylePresets.TOP_P4 ?clockXY[1]-(maxTextHeight+radiusOfHourDot)
+                                        :0;
+        if(datePresets==DateStylePresets.LEFT_P1 || datePresets==DateStylePresets.RIGHT_P3) {
+            canvas.save();
+            if(datePresets==DateStylePresets.LEFT_P1) {
+                canvas.rotate(-90, x, clockXY[1] + maxTextHeight + radiusOfHourDot);
+            }
+            else if(datePresets==DateStylePresets.RIGHT_P3) {
+                canvas.rotate(90, x, clockXY[1] - maxTextHeight);
+            }
+        }
+        //diff between chars needed to fit the remaining gap - desired - text width / no. of chars to spread between
+        float gapDiff =
+                datePresets==DateStylePresets.LEFT_P1 || datePresets==DateStylePresets.RIGHT_P3 ?
+                ((maxTextHeight*2 +radiusOfHourDot) - paint.measureText(day))/(day.length()-1):
+                        datePresets==DateStylePresets.BOTTOM_P2 || datePresets==DateStylePresets.TOP_P4 ?
+                ((clockDigitWidth*2) - paint.measureText(day))/(day.length()-1):
+                                0;
+        for(int i =0; i<day.length(); i++){
+            char c = day.charAt(i);
+            //bear in mind x, y inverted so +x -> - ,vice versa
+            canvas.drawText(c+"", x,y,paint);
+            x+=gapDiff+paint.measureText(c+"");
+        }
+
+        x =datePresets==DateStylePresets.LEFT_P1 ?
+                clockXY[0]-(clockDigitWidth +radiusOfHourDot*2 +dayRect.height()):
+                datePresets==DateStylePresets.RIGHT_P3 ?
+                        clockXY[0]+clockDigitWidth+radiusOfHourDot*2 + dayRect.height():
+                        clockXY[0]-clockDigitWidth;
+        y = datePresets==DateStylePresets.BOTTOM_P2 ?clockXY[1]+maxTextHeight+radiusOfHourDot+dayRect.height()*2:
+                datePresets==DateStylePresets.TOP_P4 ?clockXY[1]-(maxTextHeight+dayRect.height()+radiusOfHourDot)
+                        :y;
+        if(datePresets==DateStylePresets.LEFT_P1 || datePresets==DateStylePresets.RIGHT_P3) {
+            canvas.restore();
+            canvas.save();
+            if(datePresets==DateStylePresets.LEFT_P1) {
+                canvas.rotate(-90, x, clockXY[1] + maxTextHeight + radiusOfHourDot);
+            }
+            else if(datePresets==DateStylePresets.RIGHT_P3) {
+                canvas.rotate(90, x, clockXY[1] - maxTextHeight);
+            }
+        }
+
+
+        // to keep the size in bounds - ratio(day chars/date chars)  * dateSize
+        paint.setTextSize(((float)day.length()/date.length())*dateSize);
+        gapDiff=datePresets==DateStylePresets.LEFT_P1 || datePresets==DateStylePresets.RIGHT_P3 ?
+                ((maxTextHeight*2 +radiusOfHourDot) - paint.measureText(date))/(date.length()-1):
+                datePresets==DateStylePresets.BOTTOM_P2 || datePresets==DateStylePresets.TOP_P4 ?
+                        ((clockDigitWidth*2) - paint.measureText(date))/(date.length()-1):
+                        0;
+        for(int i =0; i<date.length(); i++){
+            char c = date.charAt(i);
+            //bear in mind x, y inverted so +x -> - ,vice versa
+            canvas.drawText(c+"", x, y,paint);
+            x+=gapDiff+paint.measureText(c+"");
+        }
+        if(datePresets==DateStylePresets.LEFT_P1 || datePresets==DateStylePresets.RIGHT_P3)
+            canvas.restore();
+        /* -----------Preset 2 - Bottom Align-----------------*/
+//                c.drawText("08 Sep 2020",rectF.centerX()-(clockWidth+radiusOfHourDot*2),rectF.centerY()+maxTextHeight - f.height(), clockTextPaint);
+
+        setBackground(new BitmapDrawable(getResources(),bitmap));
+
+    }
+    public void setColourBasedOnWallpaper(int bg, int other){
+        bgColour=bg;
+        topColour=other;
+        initStaticChartElements(mainBGRectF,sectors,dateSize);
+    }
+    protected void onDraw(Canvas canvas) {
+//        canvas.clipPath(p, Region.Op.DIFFERENCE)
+        makePie(canvas, mainBGRectF);
+        super.onDraw(canvas);
+    }
+    //PieChart with respect to time
+    //The pie chart represents real time by shading itself as time elapses (24hrs)
+    //tells us what sector the time is currently in
+    //names each sector
+    //t - times for goals
+    //todo elements not changed once drawn should be extracted in a bitmap
+    //  ARGB values in paint moddable by the user
+
+    // TODO: 08/11/2020
+    //  ALARMS, REMINDERS
+    //  MEDIUM:
+    //  -WIDGET - time cursor should not be transparent
+    //  LOW: (Fix essential for robustness / Occur only in extreme testing conditions/ chances of occurring normally are slim to none)
+    //  (TEST - CHANGED CONSTRAINTS: thread.sleep(), elapsedTime)
+    //  - (check findsectorangle for this )when testing, skipping 1300s every second caused the green sector to overlap the next sectors till the end,
+    //  doesn't happen when skipping every second normally
+//    private String nextSectorName;
+    private void makePie(Canvas canvas, RectF bgRectF) {
+        canvas.save();
+        canvas.rotate(CANVAS_ROTATION,bgRectF.centerX(),bgRectF.centerY()); // 0 degrees on top instead of at 90 degrees, for convenience
+
+        /*----SECTORS----*/
+        float currTimeAngle = getAngleForTimeInSeconds((int) elapsed_time);
+        //determines what sector time is in
+        findSectorForAngle(currTimeAngle);
+        if(currSector!=null) {
+            /* Draw the elapsed time sector */
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(strokeWidthArc);
+            paint.setColor(currSector.getColour());
+//        paint.setAlpha(getRGBAlpha(1f));
+            float currSectorStartAngle = getAngleForTimeInSeconds(currSector.getStartTime() * 60);
+            canvas.drawArc(bgRectF, currSectorStartAngle,
+                    (currTimeAngle-currSectorStartAngle<0?currTimeAngle+360:currTimeAngle)-currSectorStartAngle, false, paint);
+
+        }
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(topColour);
+        /* time cursor */
+        float[] xy = polarToCartesian(bgRectF.centerX(),bgRectF.centerY(),bgRectF.width()*.5f,currTimeAngle);
+        canvas.save();
+        canvas.rotate(currTimeAngle+180,xy[0],xy[1]); // +180 to invert the cursor to point downwards
+        canvas.translate(xy[0],xy[1]);
+        canvas.drawPath(timeCursor,paint);
+        canvas.restore();
+        //if editing then change only the selected sector state
+        if(isEditing){
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(strokeWidthArc);
+            float sweep_angle = getAngleForTimeInSeconds(selectedSector.getTotalTime(CLOCK_HOUR_MODE)*60);
+            paint.setColor(selectedSector.getColour());
+            canvas.drawArc(bgRectF, start_angle+getAngleForTimeInSeconds(selectedSector.getStartTime()*60), sweep_angle, false, paint);
+//            Log.d(TAG,"sectors "+s.getName()+" "+(start_angle+getAngleForTimeInSeconds(s.getStartTime()*60))+" "+(sweep_angle));
+        }
+
+//        canvas.clipOutRect(rectF);
+
+        /*----TIME----*/
+//        if(clockEnabled) {
+//            float currTimeAngle = getAngleForTimeInSeconds((int) elapsed_time);
+            /*1. this path will draw current time always*/
+
+            /*2. once time reaches the start time, start drawing the arc to represent time past*/
+//            float timeStartAngle = getAngleForTimeInSeconds(9*3600); // starts at9  (as a test, set by the user)
+            paint.setStyle(Paint.Style.FILL);
+//            paint.setColor(Color.BLUE);
+//            paint.setAlpha(getPaintAlpha(0.5f));
+
+//            if (currTimeAngle >= (AmOrPm ? (360 - timeStartAngle) : timeStartAngle)) {
+//                float sweepy = currTimeAngle - timeStartAngle;
+//                if (AmOrPm)
+//                    sweepy = currTimeAngle + (360 - timeStartAngle); //gone past 360/0
+//                canvas.drawArc(rectF, timeStartAngle, sweepy, true, paint);
+//            }
+//            Log.d(TAG, "ELAPSED TIME (SECONDS) " + elapsed_time + "-> ANGLE " + currTimeAngle);
+            /*3. draw out clock time text in the middle*/
+            canvas.restore(); //restore here so text isn't rotated as well
+            paint.setTextSize(clockTextSize);
+            paint.setColor(topColour);
+//            paint.setTextAlign(Paint.Align.CENTER);
+
+
+            if(isEditing){
+                int[] s;
+                if(alphaValueAnimator.isRunning()) {
+                     s= Helpers.timeConversion(elapsed_time);
+                    hourText = s[0] < 10 ? "0" + s[0] : s[0] + "";
+                    minuteText = s[1] < 10 ? "0" + s[1] : s[1]+"";
+                    //fade out the elapsed time
+                    paint.setAlpha(getRGBAlpha(animatedAlphaValue));
+                    addClockText(canvas, paint, clockAlignmentPresets);
+                    //fade in the edit clock text
+                    paint.setAlpha(getRGBAlpha(1- animatedAlphaValue));
+                }
+                s = Helpers.timeConversion((startBoundAngle!=-1?selectedSector.getStartTime():selectedSector.getEndTime())*60);
+                hourText = s[0] < 10 ? "0" + s[0] : s[0] + "";
+                minuteText = s[1] < 10 ? "0" + s[1] : s[1]+"";
+                addClockText(canvas,paint, clockAlignmentPresets);
+            }else{
+                if(alphaValueAnimator !=null) { //editing just stopped so animation to bring back clock
+                    int[] s;
+                    if (alphaValueAnimator.isRunning()) {
+                        s = Helpers.timeConversion((startBoundAngle!=-1?selectedSector.getStartTime():selectedSector.getEndTime())*60);
+                        hourText = s[0] < 10 ? "0" + s[0] : s[0] + "";
+                        minuteText = s[1] < 10 ? "0" + s[1] : s[1]+"";
+                        paint.setAlpha(getRGBAlpha(animatedAlphaValue));
+                        addClockText(canvas, paint, clockAlignmentPresets);
+                        paint.setAlpha(getRGBAlpha(1 - animatedAlphaValue));
+                    }
+                    if(!alphaValueAnimator.isRunning()) //since it is static setting it to null affects it instantly so we wait for it stop first
+                        alphaValueAnimator =null;
+                    s= Helpers.timeConversion(elapsed_time);
+                    hourText = s[0] < 10 ? "0" + s[0] : s[0] + "";
+                    minuteText = s[1] < 10 ? "0" + s[1] : s[1]+"";
+                }
+                addClockText(canvas,paint, clockAlignmentPresets);
+                if(currSector!=null)
+                    addSectorsDetailsText(canvas,currSector,bgRectF,clockDetailsPaint, clockAlignmentPresets);
+            }
+
+//        }
+
+    }
+    private void findSectorForAngle(float sweep_time_angle){
+        if(currSector==null) {
+            for(Sector s:sectors){
+                float sAngle = getAngleForTimeInSeconds(s.getStartTime()*60);
+                float eAngle = getAngleForTimeInSeconds(s.getEndTime() * 60);
+
+                if(eAngle<sAngle){
+                    if((sweep_time_angle>=sAngle && sweep_time_angle>eAngle) ||
+                            (sweep_time_angle<sAngle && sweep_time_angle<=eAngle)){
+                        currSector=s;
+                        Log.d(TAG, "current sector -> " + currSector.getName());
+                        break;
+                    }
+                }
+                if((sweep_time_angle>=sAngle&& sweep_time_angle<eAngle)){
+                    currSector=s;
+                    Log.d(TAG, "current sector -> " + currSector.getName());
+                    break;
+                }
+            }
+//            if(currSector!=null){
+//                int index = sectors.indexOf(currSector);
+//                nextSectorName = sectors.get(index!=sectors.size()-1?index+1:0).getName();
+//            }
+            currentSectorEndAngle = currSector!=null?getAngleForTimeInSeconds(currSector.getEndTime() * 60):0;
+        }else {
+            //handles both normal and special cases
+            //when end < start then the sweep angle will remain greater than currEndAngle until it goes past 12/24
+            if (!checkCurrentSector && sweep_time_angle < currentSectorEndAngle)
+                checkCurrentSector = true;
+            if (checkCurrentSector) {
+                if (sweep_time_angle >= currentSectorEndAngle) {
+                    currSector = null;
+                    checkCurrentSector =false;
                 }
             }
         }
-        return sector;
     }
-    private long startTime,endTime;
+    public void terminateClockerTimeThread(){
+        if(clockerTimeThread.isAlive()) {
+            clockerTimeThread.interrupt();
+            clockerTimeThread =null;
+        }
+    }
+    //todo look in to optimising touch event code further
     @Override
     public boolean onTouchEvent(MotionEvent event) {
+        if(!isEditSectorMode)
+            return false;
         //handles selecting sectors and editing their values
         float x = event.getX();
         float y = event.getY();
@@ -246,38 +639,37 @@ public class PieChartView extends View {
 
                 //ONLY IN EDIT MODE
                 if(isEditSectorMode) {
-                    //todo when a sector's total angle = 0, remove that sector upon users permission
                     userStartAngle = cartesianToPolar(x, y)-CANVAS_ROTATION; //for +/- angles
                     userStartAngle=Math.min(360f,userStartAngle>360?userStartAngle-360:userStartAngle);
                     selectedSectorTotalAngle = getAngleForTimeInSeconds(selectedSector.getTotalTime(CLOCK_HOUR_MODE) * 60);
                     startTime=selectedSector.getStartTime();
                     endTime=selectedSector.getEndTime();
-                    startBound =getAngleForTimeInSeconds(startTime*60);
-                    endBound=getAngleForTimeInSeconds(endTime*60);
-                    float middle = start_angle+(startBound +selectedSectorTotalAngle/2f);
+                    startBoundAngle =getAngleForTimeInSeconds(startTime*60);
+                    endBoundAngle =getAngleForTimeInSeconds(endTime*60);
+                    float middle = start_angle+(startBoundAngle +selectedSectorTotalAngle/2f);
 
                     //determine if its start or end bound thats changing
-                    if(endBound<startBound){ //handle the case where end bound ends up beyond 360 and find middle
+                    if(endBoundAngle < startBoundAngle){ //handle the case where end bound ends up beyond 360 and find middle
                         if(middle<360) {
-                            if (userStartAngle >= startBound && userStartAngle < middle)
-                                endBound = -1;
-                            else if (userStartAngle >= middle || userStartAngle < endBound)
-                                startBound = -1;
+                            if (userStartAngle >= startBoundAngle && userStartAngle < middle)
+                                endBoundAngle = -1;
+                            else if (userStartAngle >= middle || userStartAngle < endBoundAngle)
+                                startBoundAngle = -1;
                         }else{
-                            if(userStartAngle >=startBound || userStartAngle<(middle-360))
-                                endBound=-1;
-                            else if(userStartAngle >= (middle-360) && userStartAngle < endBound)
-                                startBound=-1;
+                            if(userStartAngle >= startBoundAngle || userStartAngle<(middle-360))
+                                endBoundAngle =-1;
+                            else if(userStartAngle >= (middle-360) && userStartAngle < endBoundAngle)
+                                startBoundAngle =-1;
                         }
                     }else {
-                        if ((userStartAngle >= startBound) && (userStartAngle < middle)) {
-                            endBound = -1;
-                        } else if ((userStartAngle >= middle) && (userStartAngle < endBound)) {
-                                startBound = -1;
+                        if ((userStartAngle >= startBoundAngle) && (userStartAngle < middle)) {
+                            endBoundAngle = -1;
+                        } else if ((userStartAngle >= middle) && (userStartAngle < endBoundAngle)) {
+                            startBoundAngle = -1;
                         }
                     }
                     int in=sectors.indexOf(selectedSector);
-                    affectedSector_index = startBound!=-1?
+                    affectedSector_index = startBoundAngle !=-1?
                             (in!=0?in-1:sectors.size()-1):
                             (in!=sectors.size()-1?in+1:0);
 //                    Log.d(TAG,"st "+startBound+" en "+endBound+" mid "+middle+" u "+userStartAngle);
@@ -290,6 +682,13 @@ public class PieChartView extends View {
             case MotionEvent.ACTION_MOVE:
                 //ONLY IN EDIT MODE
                 if(isEditSectorMode) {
+                    //disable clock
+                    if(!isEditing) {
+                        clockEnabled = false;
+                        terminateClockerTimeThread();
+                        isEditing = true;
+                    }
+
                     //suspend clock thread
                     float userCurrAngle = cartesianToPolar(x, y)-CANVAS_ROTATION;
                     userCurrAngle=Math.min(360f,userCurrAngle>360?userCurrAngle-360f:userCurrAngle);
@@ -328,29 +727,29 @@ public class PieChartView extends View {
                             dAngle = -((360 - userCurrAngle) + userStartAngle); //- since we are decreasing (anticlockwise)
                         }
                     }
-                    float newAngle=(startBound!=-1?startBound:endBound) + dAngle;
+                    float newAngle=(startBoundAngle !=-1? startBoundAngle : endBoundAngle) + dAngle;
                     newAngle=newAngle<0f?360f+newAngle:newAngle>360f?newAngle-360f:newAngle;
                     Sector affectedSector = sectors.get(affectedSector_index);
                     int newTime=getTimeForAngleInDegrees(Math.min(360, Math.max(0, newAngle))) / 60;
 
                     //Here we handled sectors limitations also handling cases where sector fell in the 'isNotNormal' state-
-                    // i.e either endTime < startTime OR affected sectors values greater or lesser than the selected sector
-                    boolean isNotNormal = startBound!=-1?
+                    // i.e either endTime < startTime OR affected sectors values differ from the selected sector(e.g should be <=selected sector values if start bound is changed).
+                    boolean isNotNormal = startBoundAngle !=-1?
                             endTime < affectedSector.getStartTime():
                             startTime > affectedSector.getEndTime(); // for start bound selected sector normally should have values greater than its affected sector
-                    long minEndTime = startBound!=-1?
-                            isNotNormal && newTime > endTime ? endTime + (CLOCK_HOUR_MODE * 60) : endTime - SECTOR_TIME_LIMIT:
-                            isNotNormal && newTime < startTime ? 0 : startTime + SECTOR_TIME_LIMIT;
-                    boolean isPartNormal = startBound!=-1?
+                    long minEndTime = startBoundAngle !=-1?
+                            isNotNormal && newTime > endTime ? endTime + (CLOCK_HOUR_MODE * 60) : endTime - MIN_SECTOR_TIME :
+                            isNotNormal && newTime < startTime ? 0 : startTime + MIN_SECTOR_TIME;
+                    boolean isPartNormal = startBoundAngle !=-1?
                             newTime < endTime && isNotNormal:
                             newTime > startTime && isNotNormal; //start time < end time as normal however still isNotNormal
-                    boolean limiter = startBound!=-1?
-                            newTime<=minEndTime && (isPartNormal?
-                            newTime<=affectedSector.getStartTime()+SECTOR_TIME_LIMIT : newTime>=affectedSector.getStartTime()+SECTOR_TIME_LIMIT) :
-                            newTime>=minEndTime && (isPartNormal?
-                                    newTime>=affectedSector.getEndTime()-SECTOR_TIME_LIMIT : newTime<=affectedSector.getEndTime()-SECTOR_TIME_LIMIT);
+                    boolean limiter = startBoundAngle !=-1?
+                            newTime<=minEndTime && (isPartNormal? newTime<=affectedSector.getStartTime()+ MIN_SECTOR_TIME :
+                                    newTime>=affectedSector.getStartTime()+ MIN_SECTOR_TIME) :
+                            newTime>=minEndTime && (isPartNormal? newTime>=affectedSector.getEndTime()- MIN_SECTOR_TIME :
+                                    newTime<=affectedSector.getEndTime()- MIN_SECTOR_TIME);
 
-                    if (startBound != -1) { //start time is being changed
+                    if (startBoundAngle != -1) { //start time is being changed
                         //here newtime is start time
                         if(limiter) {
                             selectedSector.setStartTime(newTime);
@@ -364,8 +763,21 @@ public class PieChartView extends View {
                         }
                     }// sector being changed
                     userStartQuadrant = getQuadrant(userCurrAngle);
-                    invalidate();
-
+                    if(alphaValueAnimator ==null) {
+                        alphaValueAnimator = ValueAnimator
+                                .ofFloat(1.0f,0.9f, 0.8f, 0.7f, 0.6f, 0.5f, 0.4f, 0.3f, 0.2f, 0.1f, 0.0f);
+                        alphaValueAnimator.setDuration(1000);
+                        alphaValueAnimator.addUpdateListener((animation -> {
+                            animatedAlphaValue = (float) animation.getAnimatedValue();
+                            postInvalidateOnAnimation();
+                        }));
+                        alphaValueAnimator.start();
+                    }
+                    if(!alphaValueAnimator.isRunning()) {
+                        //invalidate normally when not running
+                        invalidate();
+                    }
+                    //need the alpha value
                     //todo HAVE USER EXPLICITLY DELETE FROM SECTOR LIST. USER SHOULD NOT BE ABLE TO GO PAST SECTOR MIN TIME
 //                    if(affectedSector.getTotalTime(CLOCK_HOUR_MODE)==0){
 //                        Log.d(TAG,"SECTOR REMOVED: "+ affectedSector.getName());
@@ -381,6 +793,17 @@ public class PieChartView extends View {
 
                 break;
             case MotionEvent.ACTION_UP:
+                if(isEditing) {
+                    currSector=null;
+                    clockEnabled=true;
+                    runClockThread();
+                    isEditing =false;
+                    if(alphaValueAnimator !=null) {
+                        //to change back to real time
+                        alphaValueAnimator.start();
+                    }
+                    initStaticChartElements(mainBGRectF,sectors,dateSize);
+                }
                 //todo if clicked then handle displaying details of that sector
                 //  -time left,
 //                resume clock
@@ -389,106 +812,178 @@ public class PieChartView extends View {
         }
         return true;
     }
+    // spans the text over the desired width
+    private float getTextSizeForWidth(Paint paint, float desiredWidth,
+                                      String text, float maxSize) {
+
+//        // Pick a reasonably large value for the test. Larger values produce
+//        // more accurate results, but may cause problems with hardware
+//        // acceleration. But there are workarounds for that, too; refer to
+//        // http://stackoverflow.com/questions/6253528/font-size-too-large-to-fit-in-cache
+
+        // Get the bounds of the text, using our testTextSize.
+        paint.setTextSize(maxSize);
+        Rect bounds = new Rect();
+        paint.getTextBounds(text, 0, text.length(), bounds);
+
+        // Calculate the desired size as a proportion of our testTextSize.
+        return maxSize * desiredWidth / bounds.width();
+    }
+
+    private Rect clockTextMeasure = new Rect();
+    private int maxTextHeight;
+    private float clockDigitWidth;
+    private void addClockText(Canvas c, Paint clockTextPaint, @ClockTextAlignment int alignment){
+        //add custom alignments for the text, top left right bottom center.
+        radiusOfHourDot = Math.round(outerToInnerGap*.5f); //radius of the hour 'dot' (max radius) - used as a gap
+
+        paint.getTextBounds(hourText,0,hourText.length(), clockTextMeasure); //height of the hour text
+        //THIS WILL KEEP THE HEIGHT SAME WHEN SIZE CHANGES
+        if(clockTextMeasure.height()>maxTextHeight)
+            maxTextHeight=clockTextMeasure.height();
+        switch(alignment) {
+            case ClockTextAlignment.TOP: //270
+            case ClockTextAlignment.LEFT: //180
+            case ClockTextAlignment.RIGHT: //0
+                c.drawText(hourText, clockXY[0]- clockDigitWidth, clockXY[1], clockTextPaint);
+                c.drawText(minuteText, clockXY[0]- clockDigitWidth, clockXY[1]+maxTextHeight+radiusOfHourDot, clockTextPaint);
+                break;
+            case ClockTextAlignment.CENTER:
+                c.drawText(hourText, clockXY[0]- clockDigitWidth, clockXY[1], clockTextPaint);
+                c.drawText(minuteText, clockXY[1]- clockDigitWidth, clockXY[1]+ maxTextHeight+radiusOfHourDot, clockTextPaint);
+                break;
+            case ClockTextAlignment.BOTTOM: //90
+                c.drawText(hourText, clockXY[0]- clockDigitWidth, clockXY[1] - radiusOfHourDot, clockTextPaint);
+                c.drawText(minuteText, clockXY[0]- clockDigitWidth, clockXY[1]+ maxTextHeight, clockTextPaint);
+                break;
+        }
+    }
+    private TextPaint sectorTextPaint;
+    private void addSectorsDetailsText(Canvas c, Sector currSector, RectF rectF, Paint p, @ClockTextAlignment int alignment){
+        float radiusOfHourDot = Math.round(outerToInnerGap/2f); //radius of the hour 'dot' (max radius)
+        p.setTextSize(.06f*rectF.width());
+        p.setColor(topColour);
+        int[] t = Helpers.timeConversion(elapsed_time<currSector.getEndTime()*60?currSector.getEndTime()*60-elapsed_time:
+                currSector.getCorrectedEndTime(CLOCK_HOUR_MODE)*60 -elapsed_time);
+        //get only the greatest time value
+        String time =
+                (t[0]!=0?t[1]!=0?"> "+t[0]+(t[0]!=1?" hrs":" hr"):t[0]+(t[0]!=1?" hrs":" hr"):"")+
+                (t[1]!=0&&t[0]==0?(t[1]<10?"0"+t[1]+(t[1]!=1?" mins":" min"):t[1]+" mins"):"")+
+                (t[2]!=0&&t[1]==0&&t[0]==0?(t[2]<10?"0"+t[2]+(t[2]!=1?" secs":" sec"):t[2]+" secs"):"");
+        //truncate curr sector text
+        if(sectorTextPaint==null)
+            sectorTextPaint=new TextPaint(p);
+        String currSec = TextUtils.ellipsize(
+                currSector.getName(),
+                sectorTextPaint,
+                (rectF.width()*.7f)-(rectF.width()*.3f), //length of the divider line
+                TextUtils.TruncateAt.END).toString();
+
+        float[] xy = polarToCartesian(rectF.centerX(),rectF.centerY(),
+                (rectF.width()/2f)-(float) (getAngleForTimeInSeconds(CLOCK_HOUR_MODE/12*60*60)/360f * (2*Math.PI*(rectF.width()/2f))),
+                90);
+        p.setStyle(Paint.Style.FILL);
+        Rect rect = new Rect();
+        p.getTextBounds(time,0,time.length(),rect);
+        switch (alignment){
+            case ClockTextAlignment.TOP:
+                //bottom, left , right
+                /* Sector name */
+                c.drawText(currSec, xy[0]-p.measureText(currSec)*.5f,
+                        xy[1], p);
+                /* remaining time */
+                p.setTextSize(.04f*rectF.width());
+                c.drawText(time, xy[0]-p.measureText(time)*.5f,
+                        xy[1]+rect.height()+radiusOfHourDot, p);
+                break;
+            case ClockTextAlignment.CENTER:
+                break;
+//            case ClockTextAlignment.BOTTOM:
+//                break;
+//            case ClockTextAlignment.LEFT:
+//                break;
+//            case ClockTextAlignment.RIGHT:
+//                break;
+        }
+    }
+
+    @IntDef({ClockTextAlignment.TOP, ClockTextAlignment.LEFT, ClockTextAlignment.CENTER, ClockTextAlignment.RIGHT, ClockTextAlignment.BOTTOM})
+    @Retention(RetentionPolicy.SOURCE)
+    private @interface ClockTextAlignment {
+        int CENTER = -1;
+        int TOP = 270;
+        int LEFT = 180;
+        int BOTTOM = 90;
+        int RIGHT = 0;
+    }
+    @IntDef({DateStylePresets.LEFT_P1, DateStylePresets.BOTTOM_P2, DateStylePresets.RIGHT_P3,DateStylePresets.TOP_P4})
+    @Retention(RetentionPolicy.SOURCE)
+    private @interface DateStylePresets {
+        int LEFT_P1 = 0;
+        int BOTTOM_P2 = 1;
+        int RIGHT_P3 = 2;
+        int TOP_P4 = 3;
+    }
+
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+    }
+
+    private void setSectorNumbersTextSize(float size){
+        sectorNumbersTextSize =size;
+    }
+
+
+    private Sector findSectorForXY(float x, float y, ArrayList<Sector> data){
+        //check the sector bounds the angle falls in
+        Sector sector = null;
+        for (int i=0; i<data.size() ; i++) {
+            float startBound = getAngleForTimeInSeconds(data.get(i).getStartTime()*60),
+                    endBound = getAngleForTimeInSeconds(data.get(i).getEndTime()*60);
+            float a =cartesianToPolar(x,y)-CANVAS_ROTATION;
+            a=a>360?a-360f:a;
+            float angle = Math.round(a*10f)/10f; // to 1 dp
+//            Log.d(TAG, "start "+startBound + " end " + endBound+" angle "+angle+" n "+ data.get(i).getName());
+
+            if(angle>=startBound &&
+                    angle<=endBound){
+                sector= data.get(i);
+//                Log.d(TAG,"normal "+data.get(i).getName());
+                break;
+            }
+            //check if a sector lies in the 'special' area - end is lesser than start
+            if(endBound-startBound<0){
+                if(angle>=startBound || angle<=endBound){
+                    sector= data.get(i);
+//                    Log.d(TAG,"special "+data.get(i).getName());
+                }
+            }
+        }
+        return sector;
+    }
 
     private int getQuadrant(float currentAngle){
         if(currentAngle<0 || currentAngle>360)
-            throw new IllegalStateException("Invalid angle! : "+currentAngle);
+        throw new IllegalStateException("Invalid angle! : "+currentAngle);
         return
-                currentAngle>0 && currentAngle<=90?1://1st quadrant
-                currentAngle>90&&currentAngle<=180?2: //2nd quadrant
-                currentAngle>180&&currentAngle<=270?3://3rd quadrant
-                currentAngle>270&&currentAngle<=360?4://4th quadrant
-                        0;
+        currentAngle>0 && currentAngle<=90?1://1st quadrant
+        currentAngle>90&&currentAngle<=180?2: //2nd quadrant
+        currentAngle>180&&currentAngle<=270?3://3rd quadrant
+        currentAngle>270&&currentAngle<=360?4://4th quadrant
+        0;
     }
+
     private boolean isDirectionClockwise(float currentAngle, float dx, float dy){
         return
-                ((currentAngle>0&&currentAngle<=90) && (dx<0||dy>0)) || //1st quadrant
-                ((currentAngle>90&&currentAngle<=180) && (dx<0||dy<0)) || //2nd quadrant
-                ((currentAngle>180&&currentAngle<=270) && (dx>0||dy<0)) || //3rd quadrant
-                ((currentAngle>270&&currentAngle<=360) && (dx>0||dy>0)); //4th quadrant
+        ((currentAngle>0&&currentAngle<=90) && (dx<0||dy>0)) || //1st quadrant
+        ((currentAngle>90&&currentAngle<=180) && (dx<0||dy<0)) || //2nd quadrant
+        ((currentAngle>180&&currentAngle<=270) && (dx>0||dy<0)) || //3rd quadrant
+        ((currentAngle>270&&currentAngle<=360) && (dx>0||dy>0)); //4th quadrant
     }
-    //PieChart with respect to time
-    //The pie chart represents real time by shading itself as time elapses (24hrs)
-    //tells us what sector the time is currently in
-    //names each sector
-    //t - times for goals
-
-    private void makePie(ArrayList<Sector> sectors, Canvas canvas, RectF rectF) {
-        canvas.rotate(CANVAS_ROTATION,rectF.centerX(),rectF.centerY()); // 0 degrees on top instead of at 90 degrees
-
-        paint.setStyle(Paint.Style.FILL);
-        paint.setAntiAlias(true);
-        float radius = (rectF.right - rectF.left) / 2;
-//        radius *= 1; // 0 being centered, 1 being on the arc edges.
-        paint.setAlpha(getPaintAlpha(1f));
-        //lay down the clock numbers
-        float startTimeAngle= 0f; // start with 270 degrees as it represents the top of the 'circle'
-        //todo take sweepAngle out of the scope to avoid having it called every time
-        float sweepAngle = getAngleForTimeInSeconds(3600); //1hr gap
-        for(int i = 0; i< CLOCK_HOUR_MODE; i++){
-            paint.setTextSize(sectorTextSize);
-            paint.setColor(Color.BLACK);
-
-            clockNumbersPath.rewind();
-            clockNumbersPath.addArc(rectF,startTimeAngle,sweepAngle); //- offset the text in the middle of the angles
-            canvas.drawTextOnPath((i==0? CLOCK_HOUR_MODE :(CLOCK_HOUR_MODE -(CLOCK_HOUR_MODE -i)))+"", clockNumbersPath,0f,-strokeWidthArc,paint);
-            startTimeAngle+=sweepAngle;
-        }
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(strokeWidthArc);
-//        canvas.clipOutRect(clockRectF);
-        //lay down the chart sectors
-//        float[] time_angles = new float[t.length];
-        for(Sector s: sectors){
-            float sweep_angle = getAngleForTimeInSeconds(s.getTotalTime(CLOCK_HOUR_MODE)*60);
-            paint.setColor(s.getColour());
-            canvas.drawArc(rectF, start_angle+getAngleForTimeInSeconds(s.getStartTime()*60), sweep_angle, false, paint);
-//            Log.d(TAG,"sectors "+s.getName()+" "+(start_angle+getAngleForTimeInSeconds(s.getStartTime()*60))+" "+(sweep_angle));
-        }
-        if(clockEnabled) {
-            //* TIME *
-            //updating the time sector
-            float timeStartAngle = getAngleForTimeInSeconds(9*3600); // starts at9  (as a test, set by the user)
-            float sweep_time_angle = getAngleForTimeInSeconds((int) elapsed_time);
-            //1. this path will draw current time always
-            currentTimePath.rewind();
-            currentTimePath.moveTo(rectF.centerX(),rectF.centerY());
-            float[] xy = polarToCartesian(rectF.centerX(),rectF.centerY(),radius,sweep_time_angle);
-            currentTimePath.lineTo(xy[0], xy[1]);
-            currentTimePath.close();
-            paint.setAlpha(getPaintAlpha(1f));
-            paint.setStyle(Paint.Style.STROKE);
-            paint.setStrokeWidth(5);
-            paint.setColor(Color.RED);
-            canvas.drawPath(currentTimePath,paint);
-            //2. once time reaches the start time, start drawing the arc to represent time past
-
-            paint.setStyle(Paint.Style.FILL);
-            paint.setColor(Color.BLUE);
-            paint.setAlpha(getPaintAlpha(0.5f));
-
-            if (sweep_time_angle >= (AmOrPm ? (360 - timeStartAngle) : timeStartAngle)) {
-                float sweepy = sweep_time_angle - timeStartAngle;
-                if (AmOrPm)
-                    sweepy = sweep_time_angle + (360 - timeStartAngle); //gone past 360/0
-                canvas.drawArc(rectF, timeStartAngle, sweepy, true, paint);
-            }
-            Log.d(TAG, "ELAPSED TIME (SECONDS) " + elapsed_time + "-> ANGLE " + sweep_time_angle);
-
-//
-            //determines what sector time is in (time_angle > sector_angle? loop to find sector)
-            //alternative but more costly: intersection coordinates
-//        if (sweep_time_angle > curr_sector_angle )
-//            for (float a : time_angles) {
-//                if (curr_sector_angle > sweep_time_angle)
-//                    break;
-//                curr_sector_angle += a;
-//                ++curr_sector;
-//            }
-//        Log.d(TAG, "current sector -> " + curr_sector);
-        }
+    private float getArcMeasure(PathMeasure pathMeasure, float subAngle){
+        return pathMeasure.getLength() * subAngle/360f;
     }
-
     private float[] polarToCartesian(float cx, float cy, float radius, float angle) {
         float[] xy = new float[2];
         xy[0] = (float) (cx + (radius * Math.cos(Math.toRadians(angle))));// x
@@ -502,7 +997,7 @@ public class PieChartView extends View {
     }
     //Helper : 0 - 1 alpha values
 
-    private int getPaintAlpha(float alpha) {
+    private int getRGBAlpha(float alpha) {
         if (alpha < 0 || alpha > 1)
             Log.e(TAG, "Value should be between 0 and 1.");
         return (int) (alpha * 255);
@@ -524,14 +1019,9 @@ public class PieChartView extends View {
         }
         return (int)(angleInDegrees * TOTAL_SECONDS_IN_A_DAY/360f);
     }
-    private void invalidateAndRequestLayout(){
-        invalidate(); // changes to the views attributes ... added to the onDraw queue
-        requestLayout(); // changes to size or shape
-    }
 
     //create Polygon path
-    private Path createPath(Path path,int sides, float radius){
-        float cx=getWidth()/2f, cy = getHeight()/2f;
+    private Path createPath(Path path,int sides, float radius,float cx, float cy){
         float angle = (float) (2.0 * Math.PI / sides); //since all angles are equal in a polygon
         path.moveTo(
                 (float)(cx + (radius * Math.cos(0.0))),
@@ -542,6 +1032,7 @@ public class PieChartView extends View {
                     cy + (float) (radius * Math.sin(angle * i)));
         }
         path.close();
+
         return path;
     }
     @Override

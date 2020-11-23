@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <TextView
+        android:id="@+id/hourLabel"
+        app:layout_constraintTop_toTopOf="parent"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Hour"
+        android:gravity="center"/>
+    <ImageButton
+        android:id="@+id/startHourUpBtn"
+        app:layout_constraintTop_toBottomOf="@id/hourLabel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:src="@drawable/ic_arrow_drop_up_black_24dp"/>
+
+    <TextView
+        android:id="@+id/startHourTimerText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toBottomOf="@id/startHourUpBtn"
+        app:layout_constraintBottom_toTopOf="@id/startHourDownBtn"
+        android:gravity="center"
+        android:textSize="30sp"
+        android:text="--" />
+
+    <ImageButton
+        android:id="@+id/startHourDownBtn"
+        app:layout_constraintBottom_toBottomOf="parent"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:src="@drawable/ic_arrow_drop_down_black_24dp"/>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

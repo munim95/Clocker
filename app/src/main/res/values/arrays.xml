@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="clockmodes">
+        <item>12 Hour</item>
+        <item>24 Hour</item>
+    </string-array>
+    <string-array name="clockmodesvalues">
+        <item>12</item>
+        <item>24</item>
+    </string-array>
+
+    <string-array name="dateformats">
+        <item>DDMMYYYY</item>
+        <item>MMDDYYYY</item>
+        <item>DDMMYY</item>
+        <item>MMDDYY</item>
+        <item>YYYYMMDD</item>
+        <item>YYMMDD</item>
+    </string-array>
+    <string-array name="dateformatsvalues">
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+        <item>5</item>
+        <item>6</item>
+    </string-array>
+</resources>
