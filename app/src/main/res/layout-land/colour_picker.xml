@@ -13,7 +13,7 @@
         android:layout_alignParentTop="true"
         android:weightSum="1">
 
-        <com.rigid.clocker.colourpicker.HueDisplaySurface
+        <com.rigid.clocker.colourpicker.HsvDisplay
             android:id="@+id/huedisplay"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
@@ -24,7 +24,7 @@
             android:layout_height="match_parent"
             android:background="@drawable/border"
             android:layout_weight="0.7">
-            <com.rigid.clocker.colourpicker.UserColourPreview
+            <com.rigid.clocker.colourpicker.ColourPreviewDisplay
                 android:id="@+id/colourpreview"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"

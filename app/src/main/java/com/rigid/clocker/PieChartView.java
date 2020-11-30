@@ -302,7 +302,7 @@ public class PieChartView extends View {
                 startTimeAngle += tenMinutely;
             }
         }
-        timeCursor = createPath(new Path(),3,strokeWidthArc*2,0,0);
+        timeCursor = Helpers.createPath(new Path(),3,strokeWidthArc*2,0,0);
         /*
          * We moved all the elements that do not change after drawn from the onDraw here to avoid unnecessary draw calls
          * Sectors will only be drawn again in edit mode
@@ -1020,21 +1020,6 @@ public class PieChartView extends View {
         return (int)(angleInDegrees * TOTAL_SECONDS_IN_A_DAY/360f);
     }
 
-    //create Polygon path
-    private Path createPath(Path path,int sides, float radius,float cx, float cy){
-        float angle = (float) (2.0 * Math.PI / sides); //since all angles are equal in a polygon
-        path.moveTo(
-                (float)(cx + (radius * Math.cos(0.0))),
-                (float)(cy + (radius * Math.sin(0.0))));
-        for (int i=1; i<=sides;i++) {
-            path.lineTo(
-                    cx + (float) (radius * Math.cos(angle * i)),
-                    cy + (float) (radius * Math.sin(angle * i)));
-        }
-        path.close();
-
-        return path;
-    }
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         //setting both width and height dimensions the same using the minimum of the two

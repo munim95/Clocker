@@ -2,13 +2,12 @@ package com.rigid.clocker;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
-import android.content.Context;
 import android.graphics.Color;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
-import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -21,19 +20,16 @@ import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.rigid.clocker.colourpicker.ColourPickerDialog;
-import com.rigid.clocker.colourpicker.HueDisplaySurface;
-import com.rigid.clocker.colourpicker.HueSlider;
-import com.rigid.clocker.colourpicker.UserColourPreview;
 
 import java.util.ArrayList;
 
 public class SectorsAdapter extends RecyclerView.Adapter {
     private ArrayList<Object> data;
     private RecyclerView recyclerView;
-    private Fragment context;
+    private Fragment fragment;
 
-    public SectorsAdapter(Fragment context){
-        this.context=context;
+    public SectorsAdapter(Fragment fragment){
+        this.fragment = fragment;
     }
 
     public void addData(ArrayList<Object> data){
@@ -181,7 +177,7 @@ public class SectorsAdapter extends RecyclerView.Adapter {
     class SectorsViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener {
         private TextView sectorInfo;
         private EditText sectorName;
-        private ImageView sectorColourImage;
+        private View sectorColourImage;
         private ImageButton deleteSectorBtn;
         private LinearLayout sectorInfoDetails;
         private TextView startHourText, startMinText,
@@ -233,7 +229,7 @@ public class SectorsAdapter extends RecyclerView.Adapter {
         @Override
         public void onClick(View v) {
             Sector sector = (Sector) data.get(getAdapterPosition());
-            if(v.getId()==R.id.sectorInfo) {
+            if(v.getId()==sectorInfo.getId()) {
                 if (sectorInfoDetails.getVisibility() != View.VISIBLE) {
                     sector.setExpanded(true);
                     sectorInfoDetails.animate().alpha(1).setListener(new AnimatorListenerAdapter() {
@@ -260,7 +256,7 @@ public class SectorsAdapter extends RecyclerView.Adapter {
                         }
                     }).start();
                 }
-            }else if(v.getId()==R.id.deleteSector){
+            }else if(v.getId()==deleteSectorBtn.getId()){
                 data.remove(getAdapterPosition());
                 notifyItemRemoved(getAdapterPosition());
                 for(int i =0;;i++){
@@ -271,9 +267,15 @@ public class SectorsAdapter extends RecyclerView.Adapter {
                         break;
                     }
                 }
-            }else if(v.getId()==R.id.sectorColourImage){
-                ColourPickerDialog.getInstance().show(context.getChildFragmentManager(),null);
-
+            }else if(v.getId()==sectorColourImage.getId()){
+                ColourPickerDialog colourPickerDialog = new ColourPickerDialog(colour -> {
+                    //low alpha should show a warning
+                    if(Color.alpha(colour)<255*.5f)
+                        Toast.makeText(fragment.getContext(),"CAUTION - consider higher alpha for better visibility.",Toast.LENGTH_LONG).show();
+                    sector.setColour(colour);
+                    notifyItemChanged(getAdapterPosition());
+                });
+                colourPickerDialog.show(fragment.getChildFragmentManager(),null);
             }else if(v.getId()==R.id.startHourUpBtn){
                 sector.setStartTime(sector.getStartTime()+60);
                 notifyItemChanged(getAdapterPosition());

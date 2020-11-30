@@ -72,10 +72,11 @@ public class HueSlider extends View implements HexChangedInterface{
         }
         //i tried to use the same bitmap above but I can't since
         // the canvas gets cleared out and we need it as our source bitmap to apply PorterDuff
+        //round the corners
         bitmap = getRoundedCornerBitmap(bitmap1, 20);
-        //scale the bitmap
+        //scale the bitmap so our thumb is
         Matrix m = new Matrix();
-        m.setScale(1,1-(1/(getHeight()/20f)),
+        m.setScale(1-(radius/getWidth()),1-(radius/getHeight()),
                 getWidth()/2f,getHeight()/2f);
         Bitmap out = Bitmap.createBitmap(bitmap.getWidth(),bitmap.getHeight(), Bitmap.Config.ARGB_8888);
         Canvas c = new Canvas(out);
@@ -114,29 +115,28 @@ public class HueSlider extends View implements HexChangedInterface{
         //    does not affect the functionality nonetheless.
         //    Happens when canvas draw calls are called furiously on drawBitmap().
         //FIXED: Set the bitmap as the background for this view
-
         /* Thumb */
         p.setStyle(Paint.Style.FILL);
         p.setColor(Color.HSVToColor(hsv));
-        canvas.drawCircle(Math.max(radius,Math.min(getWidth()-radius,x)),y,radius,p);
+        canvas.drawCircle(x,y,radius,p);
         p.setStyle(Paint.Style.STROKE);
         p.setStrokeWidth(1);
         p.setColor(Color.BLACK);
-        canvas.drawCircle(Math.max(radius,Math.min(getWidth()-radius,x)),y,radius,p);
+        canvas.drawCircle(x,y,radius,p);
 
     }
     @Override
     public void onHexChanged(float hue){
         hsv[0]=hue;
         //set thumbs x value
-        x=(1/(360f/(getWidth()-radius*2)))*hue;
+        x= (((getWidth()-2*radius)*hue)/360) +radius;
         invalidate();
     }
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         //subtracting radius (height/2) as we have scaled our hue slider to start from radius and end at w-radius
-        x=event.getX()-radius;
-        hsv[0]=(360f/(getWidth()-(radius*2)))*x;
+        x=Math.max(radius,Math.min(getWidth()-radius,event.getX()));
+        hsv[0]=(360f/(getWidth()-radius*2))*(x-radius);
         hueChangeInterFace.OnHueChanged(hsv[0]);
         invalidate();
         return true;

@@ -1,42 +1,49 @@
 package com.rigid.clocker.colourpicker;
 
-import android.app.Activity;
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffXfermode;
 import android.graphics.RectF;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
-import android.view.SurfaceHolder;
-import android.view.SurfaceView;
+import android.view.View;
 import android.widget.EditText;
 import android.widget.Toast;
 
 import com.rigid.clocker.R;
 
-public class HueDisplaySurface extends SurfaceView implements Runnable, HueChangeInterface, SurfaceHolder.Callback {
-    private Thread thread;
+import java.util.ArrayList;
+import java.util.List;
+
+//recieves Hue values from hue slider
+//sends saturation and value values to colour preview and alpha slider
+public class HsvDisplay extends View implements HueChangeInterface {
     private Paint p;
     private float[] hueHsv;
     private float[] userHSV;
-    private int displayColour=Color.RED;
-    private SurfaceHolder mSurfaceHolder;
+    private int displayColour=Color.RED; //colour chosen from the hue slider
+    private int currentColour =Color.RED; //hsv values from the thumb
     private RectF surfaceRect;
-    private UserColourPreviewInterface userColourPreviewInterface;
     private EditText hexText;
-    private int currentColour =Color.RED;
     private float radius;
     private float x,y;
     private HexChangedInterface hexChangedInterface;
+    private List<OnColourSetInterface> onColourSetInterfaces;
+    private Bitmap bgBmp;
+    private PorterDuffXfermode xfermode;
 
-    public HueDisplaySurface(Context context) {
+    public HsvDisplay(Context context) {
         super(context);
     }
 
-    public HueDisplaySurface(Context context, AttributeSet attrs) {
+    public HsvDisplay(Context context, AttributeSet attrs) {
         super(context, attrs);
         p=new Paint();
         p.setAntiAlias(true);
@@ -46,7 +53,6 @@ public class HueDisplaySurface extends SurfaceView implements Runnable, HueChang
         hueHsv[0]=0; //default (RED) - hue only value that changes
         hueHsv[1]=1; //s - 100%
         hueHsv[2]=1; //v - 100%
-        mSurfaceHolder = getHolder();
 
         // user dependant hsv for preview
         //communicates with preview, hex, slider
@@ -55,24 +61,15 @@ public class HueDisplaySurface extends SurfaceView implements Runnable, HueChang
         userHSV[1]=1;
         userHSV[2]=1;
 
+        onColourSetInterfaces =new ArrayList<>();
     }
-    @Override
-    public void surfaceCreated(SurfaceHolder holder) {
-        mSurfaceHolder=holder;
-        mSurfaceHolder.addCallback(this);
+    //2 interfaces - alpha slider and preview
+    public void addOnColourSetInterface(OnColourSetInterface onColourSetInterface){
+        onColourSetInterfaces.add(onColourSetInterface);
     }
-
-    @Override
-    public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-
-    }
-
-    @Override
-    public void surfaceDestroyed(SurfaceHolder holder) {
-        holder.removeCallback(this);
-    }
-    public void setUserColourPreviewInterface(UserColourPreviewInterface userColourPreviewInterface){
-        this.userColourPreviewInterface = userColourPreviewInterface;
+    private void updateInterfaces(int colour){
+        for (OnColourSetInterface onColourSetInterface : onColourSetInterfaces)
+            onColourSetInterface.onColourChanged(colour);
     }
     public void setHexChangedInterface(HexChangedInterface hexChangedInterface){
         this.hexChangedInterface=hexChangedInterface;
@@ -83,23 +80,24 @@ public class HueDisplaySurface extends SurfaceView implements Runnable, HueChang
     //from the colour slider
     @Override
     public void OnHueChanged(float hue) {
-        resume();
 
         hexText.setEnabled(false);
         hueHsv[0] =hue;
         displayColour = Color.HSVToColor(hueHsv);
         userHSV[0] = hue; //other values remain unchanged as set by user
         currentColour= Color.HSVToColor(userHSV);
-        userColourPreviewInterface.onChanged(currentColour);
+        updateInterfaces(currentColour);
         hexText.setText(getContext().getString(R.string.hexString,Integer.toHexString(currentColour).substring(2)));
         hexText.setEnabled(true);
 
-       stop();
+        invalidate();
     }
 
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
+        bgBmp = BitmapFactory.decodeResource(getResources(),R.drawable.picker_mask);
+        xfermode = new PorterDuffXfermode(PorterDuff.Mode.SRC_ATOP);
         /* Defaults */
         surfaceRect =new RectF(0,0,w,h);
         radius=Math.min(w,h)*0.05f;
@@ -107,8 +105,7 @@ public class HueDisplaySurface extends SurfaceView implements Runnable, HueChang
         y=0;
 //        hexText=((Activity)getContext()).findViewById(R.id.hexvaluetext);
         hexText.setText(getContext().getString(R.string.hexString,Integer.toHexString(currentColour).substring(2)));
-        userColourPreviewInterface.onChanged(currentColour);
-
+        updateInterfaces(currentColour);
         hexText.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {
@@ -139,64 +136,34 @@ public class HueDisplaySurface extends SurfaceView implements Runnable, HueChang
                         Color.colorToHSV(c, userHSV);
                         hueHsv[0] = userHSV[0];
                         displayColour=Color.HSVToColor(hueHsv);
-                        //calc coords corresponding hsv values
+                        //calc thumb coords corresponding hsv values
                         x = userHSV[1] * getWidth();
                         y = getHeight() - (userHSV[2] * getHeight());
-                        userColourPreviewInterface.onChanged(c);
+                        updateInterfaces(c);
                         hexChangedInterface.onHexChanged(userHSV[0]);
+                        invalidate();
                     }
                 }
             }
         });
     }
 
+
     @Override
-    public void run() {
-        Canvas canvas;
-        while (!thread.isInterrupted()) {
-            if (mSurfaceHolder.getSurface().isValid()) {
-                canvas = mSurfaceHolder.lockCanvas();
-                if(canvas==null)
-                    return;
-                p.setStyle(Paint.Style.FILL);
-                p.setColor(displayColour);
-                canvas.drawRect(surfaceRect, p);
+    protected void onDraw(Canvas canvas) {
+        super.onDraw(canvas);
+        p.setStyle(Paint.Style.FILL);
+        p.setColor(displayColour);
+        canvas.drawRect(surfaceRect, p);
+        p.setXfermode(xfermode);
+        canvas.drawBitmap(bgBmp,null,surfaceRect,p);
+        p.setXfermode(null);
 
-                /* Thumb */
-                p.setStyle(Paint.Style.STROKE);
-                p.setStrokeWidth(5);
-                p.setColor(Color.BLACK);
-                canvas.drawCircle(x, y, radius, p);
-                mSurfaceHolder.unlockCanvasAndPost(canvas);
-
-            }
-        }
-    }
-
-    /**
-     * Kill thread on activity paused
-     */
-    public void stop() {
-        if(thread!=null && thread.isAlive()) {
-//            if(mSurfaceHolder.getSurface().isValid())
-//                mSurfaceHolder.getSurface().release();
-//            try {
-            // Stop the thread == rejoin the main thread.
-            thread.interrupt(); //using interrupt instead of join because no need to wait for thread to finish task in this case
-//            } catch (InterruptedException e) {
-//            }
-//            mSurfaceHolder.removeCallback(this);
-        }
-    }
-
-    /**
-     * Start the thread when activity started
-     */
-    public void resume() {
-        if (thread == null || !thread.isAlive()) {
-            thread = new Thread(this);
-            thread.start();
-        }
+        /* Thumb */
+        p.setStyle(Paint.Style.STROKE);
+        p.setStrokeWidth(5);
+        p.setColor(Color.BLACK);
+        canvas.drawCircle(x, y, radius, p);
     }
 
     @Override
@@ -205,7 +172,7 @@ public class HueDisplaySurface extends SurfaceView implements Runnable, HueChang
         y = Math.min(getHeight(),Math.max(0,event.getY()));
         switch (event.getAction()){
             case MotionEvent.ACTION_DOWN:
-                resume();
+//                resume();
                 hexText.setEnabled(false);
                  //doing this to avoid afterTextChanged being called and ruining it smh...
                 userHSV[0]= hueHsv[0];
@@ -213,20 +180,20 @@ public class HueDisplaySurface extends SurfaceView implements Runnable, HueChang
                 userHSV[2] = (getHeight()-y)/getHeight(); //we do this to avoid rotating our BG image to fit android coords
                 currentColour = Color.HSVToColor(userHSV);
                 hexText.setText(getContext().getString(R.string.hexString,Integer.toHexString(currentColour).substring(2)));
-                userColourPreviewInterface.onChanged(currentColour);
+                updateInterfaces(currentColour);
                 break;
             case MotionEvent.ACTION_MOVE:
                 userHSV[1] = x/getWidth();
                 userHSV[2] = (getHeight()-y)/getHeight();
                 currentColour =Color.HSVToColor(userHSV);
                 hexText.setText(getContext().getString(R.string.hexString,Integer.toHexString(currentColour).substring(2)));
-                userColourPreviewInterface.onChanged(currentColour);
+                updateInterfaces(currentColour);
                 break;
             case MotionEvent.ACTION_UP:
-                stop();
                 hexText.setEnabled(true);
                 break;
         }
+        invalidate();
         return true;
     }
 }

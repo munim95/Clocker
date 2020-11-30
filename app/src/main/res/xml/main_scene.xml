@@ -7,54 +7,63 @@
         motion:constraintSetEnd="@+id/end"
         motion:duration="250"
         motion:motionInterpolator="linear">
-        <OnClick motion:targetId="@id/edit_layout"
-            motion:clickAction="transitionToEnd"/>
-    </Transition>
-    <Transition
-        motion:constraintSetStart="@+id/start"
-        motion:constraintSetEnd="@+id/end"
-        motion:duration="250"
-        motion:motionInterpolator="linear">
+        <OnSwipe motion:targetId="@id/draggable"
+            motion:dragDirection="dragUp" />
         <OnClick motion:targetId="@id/pieChartFrameLayout"
             motion:clickAction="transitionToStart"/>
     </Transition>
+<!--    <Transition-->
+<!--        motion:constraintSetStart="@+id/start"-->
+<!--        motion:constraintSetEnd="@+id/end"-->
+<!--        motion:duration="250"-->
+<!--        motion:motionInterpolator="linear">-->
+<!--        <OnClick motion:targetId="@id/pieChartFrameLayout"-->
+<!--            motion:clickAction="transitionToStart"/>-->
+<!--    </Transition>-->
 
     <ConstraintSet android:id="@+id/start">
         <Constraint
             android:id="@id/pieChartFrameLayout"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
             motion:layout_constraintStart_toStartOf="parent"
             motion:layout_constraintEnd_toEndOf="parent"
             motion:layout_constraintTop_toBottomOf="@id/mainToolbar"
-            motion:layout_constraintBottom_toTopOf="@id/edit_layout"
-            android:translationY="150dp"/> <!-- 450 - 350-->
+            motion:layout_constraintBottom_toTopOf="@id/draggable" /> <!-- 450 - 350-->
+        <Constraint
+            android:id="@id/draggable"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            motion:layout_constraintBottom_toBottomOf="parent"
+            android:translationY="25dp"/>
         <Constraint
             android:id="@id/edit_layout"
             android:layout_width="match_parent"
             android:layout_height="400dp"
-            motion:layout_constraintBottom_toBottomOf="parent"
-            motion:layout_constraintWidth_default="percent"
-            motion:layout_constraintWidth_percent="1"
-            android:translationY="350dp"/>
+            motion:layout_constraintTop_toBottomOf="@id/draggable" />
     </ConstraintSet>
 
     <ConstraintSet android:id="@+id/end">
         <Constraint
             android:id="@id/pieChartFrameLayout"
-            android:layout_width="200dp"
-            android:layout_height="200dp"
+            android:layout_width="wrap_content"
+            android:layout_height="0dp"
+            android:layout_marginBottom="25dp"
             motion:layout_constraintStart_toStartOf="parent"
             motion:layout_constraintEnd_toEndOf="parent"
             motion:layout_constraintTop_toBottomOf="@id/mainToolbar"
-            motion:layout_constraintBottom_toTopOf="@id/edit_layout" />
+            motion:layout_constraintBottom_toTopOf="@id/edit_layout"
+            />
+        <Constraint
+            android:id="@id/draggable"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            motion:layout_constraintBottom_toBottomOf="parent"
+            android:translationY="-375dp"/>
         <Constraint
             android:id="@id/edit_layout"
             android:layout_width="match_parent"
             android:layout_height="400dp"
-            motion:layout_constraintBottom_toBottomOf="parent"
-            motion:layout_constraintWidth_default="percent"
-            motion:layout_constraintWidth_percent="1"
-            android:translationY="0dp"/>
+            motion:layout_constraintBottom_toBottomOf="parent" />
     </ConstraintSet>
 </MotionScene>

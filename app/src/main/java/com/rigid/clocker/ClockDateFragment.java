@@ -1,4 +1,4 @@
-package com.rigid.clocker.settings;
+package com.rigid.clocker;
 
 import androidx.fragment.app.Fragment;
 

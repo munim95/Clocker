@@ -13,9 +13,8 @@
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:background="@drawable/tab"
-            android:enabled="true"
             android:gravity="center"
-            android:textColor="#FFF"
+            android:textColor="#80FFFFFF"
             android:text="Sectors"/>
         <TextView
             android:id="@+id/backgroundTab"
@@ -23,7 +22,6 @@
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:background="@drawable/tab"
-            android:enabled="false"
             android:gravity="center"
             android:textColor="#80FFFFFF"
             android:text="Background"/>
@@ -33,7 +31,6 @@
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:background="@drawable/tab"
-            android:enabled="false"
             android:gravity="center"
             android:textColor="#80FFFFFF"
             android:text="Clock/Date"/>

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:state_enabled="true">
+    <item android:state_activated="true">
         <shape android:shape="rectangle">
             <corners android:topLeftRadius="10dp"
                 android:topRightRadius="10dp" />
@@ -13,7 +13,7 @@
 
         </shape>
     </item>
-    <item android:state_enabled="false">
+    <item android:state_activated="false">
         <layer-list>
             <item android:top="5dp">
                 <shape
