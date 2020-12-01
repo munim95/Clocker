@@ -9,23 +9,42 @@
         android:id="@+id/wallpaperBlendSwitch"
         android:layout_width="match_parent"
         android:layout_height="50dp"
+        android:layout_marginStart="5dp"
         android:text="Blend with wallpaper"/>
 
-    <LinearLayout
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="50dp"
-        android:orientation="horizontal">
+        android:layout_height="wrap_content"
+        android:background="@drawable/transparent_bg">
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:orientation="horizontal"
+            android:background="#50000000"/>
         <TextView
             android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:text="Choose colour"
-            android:layout_weight="1"
-            android:gravity="start|center"/>
+            android:layout_height="wrap_content"
+            android:padding="3dp"
+            android:text="Background colour"
+            android:background="#fff" />
+    </FrameLayout>
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/transparent_bg">
+
         <FrameLayout
-            android:layout_weight="1"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:orientation="horizontal"
+            android:background="#50000000"/>
+        <TextView
             android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:background="@android:color/background_dark"/>
-    </LinearLayout>
+            android:layout_height="wrap_content"
+            android:padding="3dp"
+            android:text="Background inlaid colour"
+            android:background="#fff" />
+    </FrameLayout>
 
 </LinearLayout>
