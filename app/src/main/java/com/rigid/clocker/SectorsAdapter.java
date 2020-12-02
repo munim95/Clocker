@@ -3,6 +3,7 @@ package com.rigid.clocker;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -274,7 +275,7 @@ public class SectorsAdapter extends RecyclerView.Adapter {
                         Toast.makeText(fragment.getContext(),"CAUTION - consider higher alpha for better visibility.",Toast.LENGTH_LONG).show();
                     sector.setColour(colour);
                     notifyItemChanged(getAdapterPosition());
-                });
+                },((ColorDrawable)sectorColourImage.getBackground()).getColor());
                 colourPickerDialog.show(fragment.getChildFragmentManager(),null);
             }else if(v.getId()==R.id.startHourUpBtn){
                 sector.setStartTime(sector.getStartTime()+60);

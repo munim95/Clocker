@@ -30,8 +30,6 @@ public class HueSlider extends View implements HexChangedInterface{
     //we save a 'snapshot' in a bitmap
     private Bitmap bitmap;
     private float radius;
-
-
     private float x, y;
     public HueSlider(Context context) {
         super(context);
@@ -45,27 +43,30 @@ public class HueSlider extends View implements HexChangedInterface{
     public void setHueChangeInterFace(HueChangeInterface hueChangeInterFace){
         this.hueChangeInterFace = hueChangeInterFace;
     }
-
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
+
         p.setAntiAlias(true);
-        x=getHeight()/2f;
+        radius=getHeight()/2f;
+        x= (((getWidth()-2*radius)*hsv[0])/360) +radius;
         y=getHeight()/2f;
-        radius=x;
-        /* these values dont change*/
+        /* these values do not change*/
         hsv[1]=1;
         hsv[2]=1;
 
         //get the snapshot of the canvas and use the bitmap
+        float[] bmpHsv = new float[3];
+        bmpHsv[1]=1;
+        bmpHsv[2]=2;
         Bitmap bitmap1= Bitmap.createBitmap(getWidth(),getHeight(),Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bitmap1);
         float ratio = 360f / getWidth();
         for (int y = 0; y <= getHeight(); y++) {
             for (int i = 0; i <= getWidth(); i++) {
-                hsv[0] = i * ratio;
+                bmpHsv[0] = i * ratio;
                 p.setColor(
-                        Color.HSVToColor(hsv)
+                        Color.HSVToColor(bmpHsv)
                 );
                 canvas.drawPoint(i, y, p);
             }
@@ -129,8 +130,13 @@ public class HueSlider extends View implements HexChangedInterface{
     public void onHexChanged(float hue){
         hsv[0]=hue;
         //set thumbs x value
-        x= (((getWidth()-2*radius)*hue)/360) +radius;
+        x=(((getWidth()-2*radius)*hue)/360) +radius;
         invalidate();
+    }
+    public void onColourReceive(int colour) {
+        Color.colorToHSV(colour,hsv);
+        hsv[1]=1;
+        hsv[2]=1;
     }
     @Override
     public boolean onTouchEvent(MotionEvent event) {
@@ -146,4 +152,5 @@ public class HueSlider extends View implements HexChangedInterface{
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         super.onMeasure(widthMeasureSpec,heightMeasureSpec);
     }
+
 }

@@ -12,6 +12,7 @@ import android.graphics.RectF;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.EditText;
@@ -26,10 +27,10 @@ import java.util.List;
 //sends saturation and value values to colour preview and alpha slider
 public class HsvDisplay extends View implements HueChangeInterface {
     private Paint p;
-    private float[] hueHsv;
+    private float[] staticDisplayHsv;
     private float[] userHSV;
     private int displayColour=Color.RED; //colour chosen from the hue slider
-    private int currentColour =Color.RED; //hsv values from the thumb
+    private int currentColour =displayColour; //hsv values from the thumb
     private RectF surfaceRect;
     private EditText hexText;
     private float radius;
@@ -49,10 +50,10 @@ public class HsvDisplay extends View implements HueChangeInterface {
         p.setAntiAlias(true);
         //hue slider dependant hsv
         //only responsible for displaying here
-        hueHsv =new float[3];
-        hueHsv[0]=0; //default (RED) - hue only value that changes
-        hueHsv[1]=1; //s - 100%
-        hueHsv[2]=1; //v - 100%
+        staticDisplayHsv =new float[3];
+        staticDisplayHsv[0]=0; //default (RED) - hue only value that changes
+        staticDisplayHsv[1]=1; //s - 100%
+        staticDisplayHsv[2]=1; //v - 100%
 
         // user dependant hsv for preview
         //communicates with preview, hex, slider
@@ -80,10 +81,9 @@ public class HsvDisplay extends View implements HueChangeInterface {
     //from the colour slider
     @Override
     public void OnHueChanged(float hue) {
-
         hexText.setEnabled(false);
-        hueHsv[0] =hue;
-        displayColour = Color.HSVToColor(hueHsv);
+        staticDisplayHsv[0] =hue;
+        displayColour = Color.HSVToColor(staticDisplayHsv);
         userHSV[0] = hue; //other values remain unchanged as set by user
         currentColour= Color.HSVToColor(userHSV);
         updateInterfaces(currentColour);
@@ -101,8 +101,11 @@ public class HsvDisplay extends View implements HueChangeInterface {
         /* Defaults */
         surfaceRect =new RectF(0,0,w,h);
         radius=Math.min(w,h)*0.05f;
-        x=w;
-        y=0;
+
+        x=userHSV[1]*getWidth();
+        y=getHeight()-(userHSV[2]*getHeight());
+//        x=w;
+//        y=0;
 //        hexText=((Activity)getContext()).findViewById(R.id.hexvaluetext);
         hexText.setText(getContext().getString(R.string.hexString,Integer.toHexString(currentColour).substring(2)));
         updateInterfaces(currentColour);
@@ -134,8 +137,8 @@ public class HsvDisplay extends View implements HueChangeInterface {
                         }
                         int c = Color.parseColor(s.toString()); //convert Hex to int
                         Color.colorToHSV(c, userHSV);
-                        hueHsv[0] = userHSV[0];
-                        displayColour=Color.HSVToColor(hueHsv);
+                        staticDisplayHsv[0] = userHSV[0];
+                        displayColour=Color.HSVToColor(staticDisplayHsv);
                         //calc thumb coords corresponding hsv values
                         x = userHSV[1] * getWidth();
                         y = getHeight() - (userHSV[2] * getHeight());
@@ -172,10 +175,9 @@ public class HsvDisplay extends View implements HueChangeInterface {
         y = Math.min(getHeight(),Math.max(0,event.getY()));
         switch (event.getAction()){
             case MotionEvent.ACTION_DOWN:
-//                resume();
                 hexText.setEnabled(false);
                  //doing this to avoid afterTextChanged being called and ruining it smh...
-                userHSV[0]= hueHsv[0];
+                userHSV[0]= staticDisplayHsv[0];
                 userHSV[1] = x/getWidth();
                 userHSV[2] = (getHeight()-y)/getHeight(); //we do this to avoid rotating our BG image to fit android coords
                 currentColour = Color.HSVToColor(userHSV);
@@ -195,5 +197,14 @@ public class HsvDisplay extends View implements HueChangeInterface {
         }
         invalidate();
         return true;
+    }
+
+    public void onColourReceive(int colour) {
+        currentColour=colour;
+        Color.colorToHSV(colour,userHSV);
+        staticDisplayHsv[0] = userHSV[0];
+        staticDisplayHsv[1] = 1;
+        staticDisplayHsv[2] = 1;
+        displayColour=Color.HSVToColor(staticDisplayHsv);
     }
 }

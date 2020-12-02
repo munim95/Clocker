@@ -11,6 +11,7 @@ import android.graphics.Paint;
 import android.graphics.Shader;
 import android.graphics.drawable.BitmapDrawable;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 
@@ -27,17 +28,17 @@ public class AlphaSlider extends View implements OnColourSetInterface {
     private float l,r,t,b,
             ww;
     private Shader linearGradient;
-    private List<OnAlphaSetInterface> onAlphaSetInterfaces;
+    private OnAlphaSetInterface onAlphaSetInterfaces;
+    private float alpha;
     public AlphaSlider(Context context) {
         super(context);
     }
 
     public AlphaSlider(Context context, @Nullable AttributeSet attrs) {
         super(context, attrs);
-        onAlphaSetInterfaces=new ArrayList<>();
     }
-    protected void addOnAlphaSetInterface(OnAlphaSetInterface onAlphaSetInterface){
-        onAlphaSetInterfaces.add(onAlphaSetInterface);
+    protected void setOnAlphaSetInterface(OnAlphaSetInterface onAlphaSetInterface){
+        onAlphaSetInterfaces=onAlphaSetInterface;
     }
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
@@ -61,7 +62,13 @@ public class AlphaSlider extends View implements OnColourSetInterface {
 
         BitmapDrawable bitmapDrawable = new BitmapDrawable(getResources(),out);
         setBackground(bitmapDrawable);
-        l=(Color.alpha(colour)*(getWidth()-ww))/255;t=0;r=l+ww;b=t+h;
+
+        l=(alpha*(getWidth()-ww))/255;
+        t=0;
+        r=l+ww;
+        b=t+h;
+
+        onAlphaSetInterfaces.onAlphaChange(l/(getWidth()-ww));
     }
 
     @Override
@@ -88,9 +95,13 @@ public class AlphaSlider extends View implements OnColourSetInterface {
         l=Math.max(0,Math.min(event.getX(),getWidth()-ww));
         r=l+ww;
         float ratio =l/(getWidth()-ww);
-        onAlphaSetInterfaces.iterator().next().onAlphaChange(ratio);
+        onAlphaSetInterfaces.onAlphaChange(ratio);
         invalidate();
         return true;
+    }
+
+    public void onColourReceive(int colour) {
+        alpha=Color.alpha(colour);
     }
 
     @Override

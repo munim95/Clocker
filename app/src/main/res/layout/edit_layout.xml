@@ -33,7 +33,7 @@
             android:background="@drawable/tab"
             android:gravity="center"
             android:textColor="#80FFFFFF"
-            android:text="Clock/Date"/>
+            android:text="Clock Styles"/>
 
     </LinearLayout>
 

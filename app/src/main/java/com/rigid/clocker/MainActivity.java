@@ -98,9 +98,6 @@ public class MainActivity extends AppCompatActivity {
         //load sectors by default
         sectorsTab.callOnClick();
     }
-    public MotionLayout getMotionLayout(){
-        return motionLayout;
-    }
 
     private View.OnClickListener onClickListener(){
         return v->{
@@ -112,6 +109,7 @@ public class MainActivity extends AppCompatActivity {
                     ((TextView)clockDateTab).setTextColor(0x80FFFFFF);
                     sectorsTab.setActivated(true);
                     ((TextView)sectorsTab).setTextColor(0xFFFFFFFF);
+
                     getSupportFragmentManager().beginTransaction().replace(R.id.editFragment,new SectorsFragment()).commit();
                 }
             }else if(v.getId()==bgTab.getId()){
@@ -122,7 +120,8 @@ public class MainActivity extends AppCompatActivity {
                     ((TextView)clockDateTab).setTextColor(0x80FFFFFF);
                     bgTab.setActivated(true);
                     ((TextView)bgTab).setTextColor(0xFFFFFFFF);
-//                    getSupportFragmentManager().beginTransaction().replace(R.id.editFragment,new BackgroundFragment()).commit();
+
+                    getSupportFragmentManager().beginTransaction().replace(R.id.editFragment,new BackgroundFragment()).commit();
                 }
             }else{
                 if(!clockDateTab.isActivated()) {
@@ -132,7 +131,8 @@ public class MainActivity extends AppCompatActivity {
                     ((TextView)bgTab).setTextColor(0x80FFFFFF);
                     clockDateTab.setActivated(true);
                     ((TextView)clockDateTab).setTextColor(0xFFFFFFFF);
-//                    getSupportFragmentManager().beginTransaction().replace(R.id.editFragment,new ClockDateFragment()).commit();
+
+                    getSupportFragmentManager().beginTransaction().replace(R.id.editFragment,new ClockDateFragment()).commit();
                 }
             }
         };

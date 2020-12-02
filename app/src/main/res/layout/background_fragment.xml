@@ -8,16 +8,21 @@
     <androidx.appcompat.widget.SwitchCompat
         android:id="@+id/wallpaperBlendSwitch"
         android:layout_width="match_parent"
-        android:layout_height="50dp"
-        android:layout_marginStart="5dp"
-        android:text="Blend with wallpaper"/>
+        android:layout_height="wrap_content"
+        android:checked="true"
+        android:padding="3dp"
+        android:text="Blend background with wallpaper"/>
 
     <FrameLayout
+        android:id="@+id/bgColourSelect"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:alpha="0.5"
+        android:clickable="false"
         android:background="@drawable/transparent_bg">
 
         <FrameLayout
+            android:id="@+id/bgColour"
             android:layout_width="match_parent"
             android:layout_height="50dp"
             android:orientation="horizontal"
@@ -29,12 +34,23 @@
             android:text="Background colour"
             android:background="#fff" />
     </FrameLayout>
-    <FrameLayout
+    <androidx.appcompat.widget.SwitchCompat
+        android:id="@+id/inlaidAdjustSwitch"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:padding="3dp"
+        android:checked="true"
+        android:text="Adjust inlaid to background"/>
+    <FrameLayout
+        android:id="@+id/inlaidColourSelect"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:alpha="0.5"
+        android:clickable="false"
         android:background="@drawable/transparent_bg">
 
         <FrameLayout
+            android:id="@+id/inlaidColour"
             android:layout_width="match_parent"
             android:layout_height="50dp"
             android:orientation="horizontal"
@@ -43,7 +59,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:padding="3dp"
-            android:text="Background inlaid colour"
+            android:text="Inlaid colour"
             android:background="#fff" />
     </FrameLayout>
 

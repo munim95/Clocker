@@ -1,7 +1,6 @@
 package com.rigid.clocker.colourpicker;
 
 import android.content.DialogInterface;
-import android.graphics.Color;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -11,18 +10,19 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.DialogFragment;
 
-import com.rigid.clocker.MainActivity;
 import com.rigid.clocker.R;
 
 public class ColourPickerDialog extends DialogFragment implements OnFinalColourSetInterface {
     private View hsvDisplay;
     private View hueSlider, alphaSlider;
     private View colourPreview;
+    private int receivingColour;
     private int finalColour;
     private final OnPickerDialogResponse onPickerDialogResponse;
 
-    public ColourPickerDialog(OnPickerDialogResponse onPickerDialogResponse){
+    public ColourPickerDialog(OnPickerDialogResponse onPickerDialogResponse, int color){
         this.onPickerDialogResponse = onPickerDialogResponse;
+        receivingColour=color;
         setStyle(DialogFragment.STYLE_NORMAL,R.style.CustomDialog);
     }
     @Nullable
@@ -35,6 +35,23 @@ public class ColourPickerDialog extends DialogFragment implements OnFinalColourS
         colourPreview=v.findViewById(R.id.colourpreview);
         v.findViewById(R.id.pickerOkBtn).setOnClickListener(clickListener());
         v.findViewById(R.id.pickerResetBtn).setOnClickListener(clickListener());
+
+        ((HueSlider)hueSlider).setHueChangeInterFace((HsvDisplay) hsvDisplay);
+
+        ((AlphaSlider)alphaSlider).setOnAlphaSetInterface((ColourPreviewDisplay)colourPreview);
+
+        ((ColourPreviewDisplay)colourPreview).setViews(
+                v.findViewById(R.id.alphaText),
+                v.findViewById(R.id.redText),
+                v.findViewById(R.id.blueText),
+                v.findViewById(R.id.greenText));
+        ((ColourPreviewDisplay)colourPreview).setOnFinalColourSetInterface(this);
+
+        ((HsvDisplay) hsvDisplay).addOnColourSetInterface((ColourPreviewDisplay)colourPreview);
+        ((HsvDisplay) hsvDisplay).addOnColourSetInterface((AlphaSlider)alphaSlider);
+        ((HsvDisplay) hsvDisplay).setHexText(v.findViewById(R.id.hexvaluetext));
+        ((HsvDisplay) hsvDisplay).setHexChangedInterface((HueSlider)hueSlider);
+
         return v;
     }
     private View.OnClickListener clickListener(){
@@ -55,7 +72,10 @@ public class ColourPickerDialog extends DialogFragment implements OnFinalColourS
     @Override
     public void onResume() {
         super.onResume();
-        ((MainActivity)getActivity()).getMotionLayout().transitionToStart();
+        ((HsvDisplay)hsvDisplay).onColourReceive(receivingColour);
+        ((HueSlider)hueSlider).onColourReceive(receivingColour);
+        ((AlphaSlider)alphaSlider).onColourReceive(receivingColour);
+
     }
 
     @Override
@@ -66,7 +86,6 @@ public class ColourPickerDialog extends DialogFragment implements OnFinalColourS
     @Override
     public void onDismiss(@NonNull DialogInterface dialog) {
         super.onDismiss(dialog);
-        ((MainActivity)getActivity()).getMotionLayout().transitionToEnd();
     }
 
 
@@ -74,25 +93,7 @@ public class ColourPickerDialog extends DialogFragment implements OnFinalColourS
     public void onActivityCreated(@Nullable Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
         getDialog().setTitle("Colour Picker");
-
-        ((HueSlider)hueSlider).setHueChangeInterFace((HsvDisplay) hsvDisplay);
-
-        ((AlphaSlider)alphaSlider).addOnAlphaSetInterface((ColourPreviewDisplay)colourPreview);
-
-        ((ColourPreviewDisplay)colourPreview).setViews(
-                getView().findViewById(R.id.alphaText),
-                getView().findViewById(R.id.redText),
-                getView().findViewById(R.id.blueText),
-                getView().findViewById(R.id.greenText));
-        ((ColourPreviewDisplay)colourPreview).setOnFinalColourSetInterface(this);
-
-        ((HsvDisplay) hsvDisplay).addOnColourSetInterface((ColourPreviewDisplay)colourPreview);
-        ((HsvDisplay) hsvDisplay).addOnColourSetInterface((AlphaSlider)alphaSlider);
-        ((HsvDisplay) hsvDisplay).setHexText(getView().findViewById(R.id.hexvaluetext));
-        ((HsvDisplay) hsvDisplay).setHexChangedInterface((HueSlider)hueSlider);
-
     }
-
     @Override
     public void onStop() {
         super.onStop();
