@@ -12,6 +12,8 @@ import android.graphics.PathMeasure;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.VectorDrawable;
 import android.text.TextPaint;
 import android.text.TextUtils;
 import android.util.AttributeSet;
@@ -132,7 +134,6 @@ public class PieChartView extends View {
     private void init(Context context, AttributeSet attrs) {
         sharedPreferences = PreferenceManager.getDefaultSharedPreferences(context);
         CLOCK_HOUR_MODE = Integer.parseInt(sharedPreferences.getString("clockmode","12"));
-        Log.d(TAG,"MODE "+CLOCK_HOUR_MODE);
         TOTAL_SECONDS_IN_A_DAY=CLOCK_HOUR_MODE * 3600;
         hourGapAngle= getAngleForTimeInSeconds(60*60);
         calendar=Calendar.getInstance();
@@ -141,7 +142,7 @@ public class PieChartView extends View {
         sectors.add(new Sector("Bla1",60,120,Color.RED));//1-2
         sectors.add(new Sector("Bla2",120,240,Color.BLUE));//2-4
         sectors.add(new Sector("Bla3",240,300,Color.GREEN));//4-5
-        sectors.add(new Sector("Bla4",300,360,Color.GRAY));//5-7
+        sectors.add(new Sector("Bla4",300,360,Color.BLUE));//5-7
         sectors.add(new Sector("Bla5",400,460,Color.RED));//5-7
 //        sectors.add(new Sector("Bla5",420,1080,Color.CYAN));//7-18 (24 only test)
 
@@ -151,6 +152,7 @@ public class PieChartView extends View {
     }
     //returns total angle
     private void isPieFull(){
+        //-1 for alpha
         int s = sectors.size();
         for(int i=0; i<s; i++){
             int next = i+1;
@@ -229,6 +231,13 @@ public class PieChartView extends View {
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
+        Drawable drawable = ((VectorDrawable)getResources().getDrawable(R.drawable.ic_android_black_24dp,null));
+        Bitmap bitmap = Bitmap.createBitmap(drawable.getIntrinsicWidth(),
+                drawable.getIntrinsicHeight(), Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        drawable.setBounds(0, 0, canvas.getWidth(), canvas.getHeight());
+        drawable.draw(canvas);
+        testBmp = bitmap;
         //add text size to the left and top of rect to avoid it clipping at the edges
         //figure out the max radius it can be, taking text in to account
         //although getWidth and height will be the same, using math.min is just a precaution
@@ -480,6 +489,7 @@ public class PieChartView extends View {
         makePie(canvas, mainBGRectF);
         super.onDraw(canvas);
     }
+    private Bitmap testBmp;
     //PieChart with respect to time
     //The pie chart represents real time by shading itself as time elapses (24hrs)
     //tells us what sector the time is currently in
@@ -563,7 +573,23 @@ public class PieChartView extends View {
             paint.setTextSize(clockTextSize);
             paint.setColor(topColour);
 //            paint.setTextAlign(Paint.Align.CENTER);
-            canvas.drawText("8",weatherXy[0],weatherXy[1],paint);
+            Rect rect = new Rect();
+            paint.getTextBounds("8",0,1,rect);
+            float y = weatherXy[1]+rect.height()*.5f;
+            canvas.drawText("8",weatherXy[0],y,paint);
+            canvas.drawBitmap(testBmp,
+                    weatherXy[0]-(testBmp.getWidth()),y-(rect.height()*.5f + testBmp.getHeight()*.5f),paint);
+            float t =testBmp.getWidth()+paint.measureText("8");
+            float x = weatherXy[0]-testBmp.getWidth();
+            paint.setTextSize(getTextSizeForWidth(paint,t,"London",clockTextSize)*.5f);
+            float g = (t-paint.measureText("London"))/"London".length()-1;
+            paint.getTextBounds("London",0,"London".length(),rect);
+            for(int i=0;i<"London".length(); i++){
+                char c  = "London".charAt(i);
+                canvas.drawText(c+"",x,y+rect.height(),paint);
+                x+=g+paint.measureText(c+"");
+            }
+            paint.setTextSize(clockTextSize);
             if(isEditing){
                 int[] s;
                 if(alphaValueAnimator.isRunning()) {
@@ -615,13 +641,13 @@ public class PieChartView extends View {
                     if((sweep_time_angle>=sAngle && sweep_time_angle>eAngle) ||
                             (sweep_time_angle<sAngle && sweep_time_angle<=eAngle)){
                         currSector=s;
-                        Log.d(TAG, "current sector -> " + currSector.getName());
+//                        Log.d(TAG, "current sector -> " + currSector.getName());
                         break;
                     }
                 }
                 if((sweep_time_angle>=sAngle&& sweep_time_angle<eAngle)){
                     currSector=s;
-                    Log.d(TAG, "current sector -> " + currSector.getName());
+//                    Log.d(TAG, "current sector -> " + currSector.getName());
                     break;
                 }
             }
