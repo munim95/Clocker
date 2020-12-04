@@ -12,7 +12,6 @@ import android.graphics.PathMeasure;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.drawable.BitmapDrawable;
-import android.os.Build;
 import android.text.TextPaint;
 import android.text.TextUtils;
 import android.util.AttributeSet;
@@ -39,6 +38,7 @@ public class PieChartView extends View {
      *  - Automatically load apps/links pre set by user at specified times
      *  - Goals change depending on location. E.g if at office display office tasks, home display home chores etc
      *  - EXTRA FEATURES (PAID) :
+     *  - MAIN - WEATHER, BACKGROUND AS ANY IMAGE, BACKGROUND ASSOCIATED WITH SECTORS
      *  (These features can be displayed at different intervals set by user to respect space.
      *   User should always be made aware of increase in battery consumption )
      *  - Alarms
@@ -89,7 +89,7 @@ public class PieChartView extends View {
     private int userStartQuadrant;
     private int switcher=-1;
     private boolean set=false;
-    private boolean isEditSectorMode=false,
+    private boolean isEditSectorMode=true,
             clockEnabled=true,
             stampsEnabled = true,
             clockNumbersEnabled = false;
@@ -104,7 +104,7 @@ public class PieChartView extends View {
     private Sector currSector=null;
     private float currentSectorEndAngle =0;
     private boolean checkCurrentSector =false;
-    private int clockAlignmentPresets = ClockTextAlignment.CENTER;
+    private int clockAlignmentPresets = ClockAlignment.LEFT;
     private int datePresets = DateStylePresets.RIGHT_P3;
     private float animatedAlphaValue =1;
     private ValueAnimator alphaValueAnimator;
@@ -141,26 +141,40 @@ public class PieChartView extends View {
         sectors.add(new Sector("Bla1",60,120,Color.RED));//1-2
         sectors.add(new Sector("Bla2",120,240,Color.BLUE));//2-4
         sectors.add(new Sector("Bla3",240,300,Color.GREEN));//4-5
-        sectors.add(new Sector("Bla4",300,337,Color.GRAY));//5-7
+        sectors.add(new Sector("Bla4",300,360,Color.GRAY));//5-7
+        sectors.add(new Sector("Bla5",400,460,Color.RED));//5-7
 //        sectors.add(new Sector("Bla5",420,1080,Color.CYAN));//7-18 (24 only test)
 
+        //todo upon user permission
         isPieFull();
 
     }
     //returns total angle
     private void isPieFull(){
-        long total=0;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            total = sectors.stream().mapToLong(sector -> sector.getTotalTime(CLOCK_HOUR_MODE)).sum();
-        }else{
-            for(Sector s: sectors){
-                total+=s.getTotalTime(CLOCK_HOUR_MODE);
+        int s = sectors.size();
+        for(int i=0; i<s; i++){
+            int next = i+1;
+            if(next<s) {
+                if (sectors.get(i).getEndTime() != sectors.get(next).getStartTime()) {
+                    sectors.add(new Sector("Break1",sectors.get(i).getEndTime(),sectors.get(next).getStartTime(),-1));
+                }
             }
         }
-        if(getAngleForTimeInSeconds(total)<360) {
-            //to check if remaining pie needs to be filled or not with break
-            long lastEnd = sectors.get(sectors.size() - 1).getEndTime(); //last sectors end = breaks start time, first sectors start = breaks end time
-            sectors.add(new Sector("Break", lastEnd, sectors.get(0).getStartTime(), Color.BLACK));
+//        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+//            total = sectors.stream().mapToLong(sector -> sector.getTotalTime(CLOCK_HOUR_MODE)).sum();
+//        }else{
+//            for(Sector s: sectors){
+//                total+=s.getTotalTime(CLOCK_HOUR_MODE);
+//            }
+//        }
+        long lastEnd = sectors.get(s - 1).getEndTime(); //last sectors end = breaks start time, first sectors start = breaks end time
+        long start = sectors.get(0).getStartTime();
+        long secs = (lastEnd-start) *60;
+        if(secs!=0) {
+            if (getAngleForTimeInSeconds(secs) < 360) {
+                //to check if remaining pie needs to be filled or not with break
+                sectors.add(new Sector("Break", lastEnd, start, -1));
+            }
         }
     }
 
@@ -210,7 +224,8 @@ public class PieChartView extends View {
 
     private float outerToInnerGap,dateSize;
     private Path timeCursor = new Path();
-    private float[] clockXY;
+    private float[] clockXy,weatherXy;
+    private String day,date;
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
@@ -231,41 +246,48 @@ public class PieChartView extends View {
         paint.setTextSize(clockTextSize);
         paint.getTextBounds(hourText,0,hourText.length(), clockTextMeasure); //height of the hour text
         maxTextHeight=clockTextMeasure.height();
-        clockDigitWidth = paint.measureText(hourText)*.5f;
+        clockHourWidth = paint.measureText(hourText)*.5f;
         //alignment coords
         //radius = bg radius - length of the 1 hr arc in 12 hr or 2 hr arc in 24hr
         outerToInnerGap =(0.05f*radius);
-        radiusOfHourDot = .5f*outerToInnerGap;
+        maxDotRadius = .5f*outerToInnerGap;
+        //hour arc length
         float length = getArcLengthForTime(mainBGRectF.width()/2f,60*60);
         dateSize =
 //                maxTextHeight*.65f
-        clockDigitWidth*.4f;
-        if(clockAlignmentPresets !=ClockTextAlignment.CENTER) {
-            //apply if preset:
+        clockHourWidth *.4f;
+        day = calendar.getDisplayName(Calendar.DAY_OF_WEEK, Calendar.LONG, Locale.getDefault());
+        date = calendar.get(Calendar.DATE)+" "+calendar.getDisplayName
+                (Calendar.MONTH,Calendar.SHORT,Locale.getDefault())+" "+
+                calendar.get(Calendar.YEAR);
+        if(clockAlignmentPresets != ClockAlignment.CENTER) {
+            //apply indent from the edge of the circle if dates are in the presets below:
             //right && !p1
             //top && !p2
             //left && !p3
             //bottom && !p4
-            if(clockAlignmentPresets==ClockTextAlignment.RIGHT && datePresets!=DateStylePresets.LEFT_P1 ||
-            clockAlignmentPresets==ClockTextAlignment.TOP && datePresets!=DateStylePresets.BOTTOM_P2 ||
-            clockAlignmentPresets==ClockTextAlignment.LEFT && datePresets!=DateStylePresets.RIGHT_P3 ||
-            clockAlignmentPresets==ClockTextAlignment.BOTTOM && datePresets!=DateStylePresets.TOP_P4) {
+            if(clockAlignmentPresets== ClockAlignment.RIGHT && datePresets!=DateStylePresets.LEFT_P1 ||
+            clockAlignmentPresets== ClockAlignment.TOP && datePresets!=DateStylePresets.BOTTOM_P2 ||
+            clockAlignmentPresets== ClockAlignment.LEFT && datePresets!=DateStylePresets.RIGHT_P3 ||
+            clockAlignmentPresets== ClockAlignment.BOTTOM && datePresets!=DateStylePresets.TOP_P4) {
                 Rect tRect = new Rect();
                 paint.setTextSize(dateSize);
                 paint.getTextBounds("S", 0, 1, tRect);
                 float size = tRect.height();
-                paint.setTextSize((6 / 11f) * dateSize);
+                paint.setTextSize(((float)day.length()/date.length())*dateSize);
                 paint.getTextBounds("0", 0, 1, tRect);
                 size += tRect.height();
 
                 length = length + size;
             }
         }
-
-        clockXY = polarToCartesian(mainBGRectF.centerX(),mainBGRectF.centerY(),
-                clockAlignmentPresets !=ClockTextAlignment.CENTER?
-                        mainBGRectF.width()/2f- length:
-                        0, clockAlignmentPresets != ClockTextAlignment.CENTER ? clockAlignmentPresets :0);
+        //xy coords relative to the given radius
+        clockXy = polarToCartesian(mainBGRectF.centerX(),mainBGRectF.centerY(),
+                clockAlignmentPresets != ClockAlignment.CENTER?
+                        radius- length:
+                        0, clockAlignmentPresets != ClockAlignment.CENTER ? clockAlignmentPresets :0);
+        weatherXy = polarToCartesian(mainBGRectF.centerX(),mainBGRectF.centerY(),
+                radius-getArcLengthForTime(radius,60*60), 0);
 
         if(stampsEnabled) {
              //gap b/w outer and inner circle
@@ -307,13 +329,13 @@ public class PieChartView extends View {
          * We moved all the elements that do not change after drawn from the onDraw here to avoid unnecessary draw calls
          * Sectors will only be drawn again in edit mode
          * */
-        initStaticChartElements(mainBGRectF, sectors,dateSize);
+        initStaticChartElements(mainBGRectF, sectors);
     }
     private float getArcLengthForTime(float radius, int seconds){
         return (float) (getAngleForTimeInSeconds(CLOCK_HOUR_MODE/12*seconds)/360f * (2*Math.PI*(radius)));
     }
-    private float radiusOfHourDot;
-    private void initStaticChartElements(RectF rectF, ArrayList<Sector> sectors, float dateSize){
+    private float maxDotRadius;
+    private void initStaticChartElements(RectF rectF, ArrayList<Sector> sectors){
         Bitmap bitmap = Bitmap.createBitmap(getWidth(),getHeight(),Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bitmap);
         canvas.save();
@@ -353,52 +375,53 @@ public class PieChartView extends View {
         for(Sector s: sectors){
             float sweep_angle = getAngleForTimeInSeconds(s.getTotalTime(CLOCK_HOUR_MODE)*60);
             paint.setColor(s.getColour());
-            paint.setAlpha(getRGBAlpha(0.2f));
+            paint.setAlpha(getRGBAlpha(s.getColour()!=-1?0.2f:0));
             canvas.drawArc(rectF, start_angle+getAngleForTimeInSeconds(s.getStartTime()*60), sweep_angle, false, paint);
 //            Log.d(TAG,"sectors "+s.getName()+" "+(start_angle+getAngleForTimeInSeconds(s.getStartTime()*60))+" "+(sweep_angle));
         }
         canvas.restore();
+
         /*------------ DATE PRESETS ----------------*/
-        /* PRESET 1 - Left Align */
+
         //use textsizeforwidth if we dont want gaps but still want to fit
 //                dateSize = getTextSizeForWidth(paint,maxTextHeight*2,"Sunday",clockTextSize);
         //max for matching width without chars intersecting - 65% of half the desired width, anything higher results in intersection/not appealing
-        String day = calendar.getDisplayName(Calendar.DAY_OF_WEEK, Calendar.LONG, Locale.getDefault());
-        String date = calendar.get(Calendar.DATE)+" "+calendar.getDisplayName(Calendar.MONTH,Calendar.SHORT,Locale.getDefault())+" "+calendar.get(Calendar.YEAR);
+
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(topColour);
         paint.setTextSize(dateSize);
         Rect dayRect = new Rect();
         paint.getTextBounds(day,0,day.length(),dayRect);
         float x =datePresets==DateStylePresets.LEFT_P1 ?
-                clockXY[0]-(clockDigitWidth +radiusOfHourDot):
+                clockXy[0]-(clockHourWidth + maxDotRadius):
                 datePresets==DateStylePresets.BOTTOM_P2 || datePresets==DateStylePresets.TOP_P4 ?
-                clockXY[0]-clockDigitWidth:
+                clockXy[0]- clockHourWidth :
                 datePresets==DateStylePresets.RIGHT_P3 ?
-                clockXY[0]+clockDigitWidth+radiusOfHourDot:
+                clockXy[0]+ clockHourWidth + maxDotRadius :
                         0;
 
-        float y = datePresets==DateStylePresets.LEFT_P1 ? clockXY[1]+maxTextHeight+radiusOfHourDot:
-                datePresets==DateStylePresets.BOTTOM_P2 ?clockXY[1]+maxTextHeight+radiusOfHourDot*2+dayRect.height():
-                        datePresets==DateStylePresets.RIGHT_P3 ?clockXY[1]-maxTextHeight:
-                                datePresets==DateStylePresets.TOP_P4 ?clockXY[1]-(maxTextHeight+radiusOfHourDot)
+        float y = datePresets==DateStylePresets.LEFT_P1 ? clockXy[1]+maxTextHeight+ maxDotRadius :
+                datePresets==DateStylePresets.BOTTOM_P2 ? clockXy[1]+maxTextHeight+ maxDotRadius *2+dayRect.height():
+                        datePresets==DateStylePresets.RIGHT_P3 ? clockXy[1]-maxTextHeight:
+                                datePresets==DateStylePresets.TOP_P4 ? clockXy[1]-(maxTextHeight+ maxDotRadius)
                                         :0;
         if(datePresets==DateStylePresets.LEFT_P1 || datePresets==DateStylePresets.RIGHT_P3) {
             canvas.save();
             if(datePresets==DateStylePresets.LEFT_P1) {
-                canvas.rotate(-90, x, clockXY[1] + maxTextHeight + radiusOfHourDot);
+                canvas.rotate(-90, x, y);
             }
             else if(datePresets==DateStylePresets.RIGHT_P3) {
-                canvas.rotate(90, x, clockXY[1] - maxTextHeight);
+                canvas.rotate(90, x, y);
             }
         }
-        //diff between chars needed to fit the remaining gap - desired - text width / no. of chars to spread between
+        //the difference in width/height between dates and clock - (clockWidth - text width) / no. of chars to spread between
         float gapDiff =
                 datePresets==DateStylePresets.LEFT_P1 || datePresets==DateStylePresets.RIGHT_P3 ?
-                ((maxTextHeight*2 +radiusOfHourDot) - paint.measureText(day))/(day.length()-1):
+                ((maxTextHeight*2 + maxDotRadius) - paint.measureText(day))/(day.length()-1):
                         datePresets==DateStylePresets.BOTTOM_P2 || datePresets==DateStylePresets.TOP_P4 ?
-                ((clockDigitWidth*2) - paint.measureText(day))/(day.length()-1):
+                ((clockHourWidth *2) - paint.measureText(day))/(day.length()-1):
                                 0;
+        //lay out individual chars of the string so it matches the height/width of the clock
         for(int i =0; i<day.length(); i++){
             char c = day.charAt(i);
             //bear in mind x, y inverted so +x -> - ,vice versa
@@ -407,21 +430,21 @@ public class PieChartView extends View {
         }
 
         x =datePresets==DateStylePresets.LEFT_P1 ?
-                clockXY[0]-(clockDigitWidth +radiusOfHourDot*2 +dayRect.height()):
+                clockXy[0]-(clockHourWidth + maxDotRadius *2 +dayRect.height()):
                 datePresets==DateStylePresets.RIGHT_P3 ?
-                        clockXY[0]+clockDigitWidth+radiusOfHourDot*2 + dayRect.height():
-                        clockXY[0]-clockDigitWidth;
-        y = datePresets==DateStylePresets.BOTTOM_P2 ?clockXY[1]+maxTextHeight+radiusOfHourDot+dayRect.height()*2:
-                datePresets==DateStylePresets.TOP_P4 ?clockXY[1]-(maxTextHeight+dayRect.height()+radiusOfHourDot)
+                        clockXy[0]+ clockHourWidth + maxDotRadius *2 + dayRect.height():
+                        clockXy[0]- clockHourWidth;
+        y = datePresets==DateStylePresets.BOTTOM_P2 ? clockXy[1]+maxTextHeight+ maxDotRadius +dayRect.height()*2:
+                datePresets==DateStylePresets.TOP_P4 ? clockXy[1]-(maxTextHeight+dayRect.height()+ maxDotRadius)
                         :y;
         if(datePresets==DateStylePresets.LEFT_P1 || datePresets==DateStylePresets.RIGHT_P3) {
             canvas.restore();
             canvas.save();
             if(datePresets==DateStylePresets.LEFT_P1) {
-                canvas.rotate(-90, x, clockXY[1] + maxTextHeight + radiusOfHourDot);
+                canvas.rotate(-90, x, y);
             }
             else if(datePresets==DateStylePresets.RIGHT_P3) {
-                canvas.rotate(90, x, clockXY[1] - maxTextHeight);
+                canvas.rotate(90, x, y);
             }
         }
 
@@ -429,9 +452,9 @@ public class PieChartView extends View {
         // to keep the size in bounds - ratio(day chars/date chars)  * dateSize
         paint.setTextSize(((float)day.length()/date.length())*dateSize);
         gapDiff=datePresets==DateStylePresets.LEFT_P1 || datePresets==DateStylePresets.RIGHT_P3 ?
-                ((maxTextHeight*2 +radiusOfHourDot) - paint.measureText(date))/(date.length()-1):
+                ((maxTextHeight*2 + maxDotRadius) - paint.measureText(date))/(date.length()-1):
                 datePresets==DateStylePresets.BOTTOM_P2 || datePresets==DateStylePresets.TOP_P4 ?
-                        ((clockDigitWidth*2) - paint.measureText(date))/(date.length()-1):
+                        ((clockHourWidth *2) - paint.measureText(date))/(date.length()-1):
                         0;
         for(int i =0; i<date.length(); i++){
             char c = date.charAt(i);
@@ -450,7 +473,7 @@ public class PieChartView extends View {
     public void setColourBasedOnWallpaper(int bg, int other){
         bgColour=bg;
         topColour=other;
-        initStaticChartElements(mainBGRectF,sectors,dateSize);
+        initStaticChartElements(mainBGRectF,sectors);
     }
     protected void onDraw(Canvas canvas) {
 //        canvas.clipPath(p, Region.Op.DIFFERENCE)
@@ -487,6 +510,7 @@ public class PieChartView extends View {
             paint.setStyle(Paint.Style.STROKE);
             paint.setStrokeWidth(strokeWidthArc);
             paint.setColor(currSector.getColour());
+            paint.setAlpha(currSector.getColour()!=-1?255:0);
 //        paint.setAlpha(getRGBAlpha(1f));
             float currSectorStartAngle = getAngleForTimeInSeconds(currSector.getStartTime() * 60);
             canvas.drawArc(bgRectF, currSectorStartAngle,
@@ -495,13 +519,14 @@ public class PieChartView extends View {
         }
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(topColour);
-        /* time cursor */
+        /* --- Time Cursor --- */
         float[] xy = polarToCartesian(bgRectF.centerX(),bgRectF.centerY(),bgRectF.width()*.5f,currTimeAngle);
         canvas.save();
         canvas.rotate(currTimeAngle+180,xy[0],xy[1]); // +180 to invert the cursor to point downwards
         canvas.translate(xy[0],xy[1]);
         canvas.drawPath(timeCursor,paint);
         canvas.restore();
+
         //if editing then change only the selected sector state
         if(isEditing){
             paint.setStyle(Paint.Style.STROKE);
@@ -511,6 +536,7 @@ public class PieChartView extends View {
             canvas.drawArc(bgRectF, start_angle+getAngleForTimeInSeconds(selectedSector.getStartTime()*60), sweep_angle, false, paint);
 //            Log.d(TAG,"sectors "+s.getName()+" "+(start_angle+getAngleForTimeInSeconds(s.getStartTime()*60))+" "+(sweep_angle));
         }
+
 
 //        canvas.clipOutRect(rectF);
 
@@ -537,8 +563,7 @@ public class PieChartView extends View {
             paint.setTextSize(clockTextSize);
             paint.setColor(topColour);
 //            paint.setTextAlign(Paint.Align.CENTER);
-
-
+            canvas.drawText("8",weatherXy[0],weatherXy[1],paint);
             if(isEditing){
                 int[] s;
                 if(alphaValueAnimator.isRunning()) {
@@ -635,8 +660,6 @@ public class PieChartView extends View {
         switch(event.getAction()){
             case MotionEvent.ACTION_DOWN:
                 selectedSector = findSectorForXY(x,y, sectors);
-                Log.d(TAG,"sector clicked: "+selectedSector.getName());
-
                 //ONLY IN EDIT MODE
                 if(isEditSectorMode) {
                     userStartAngle = cartesianToPolar(x, y)-CANVAS_ROTATION; //for +/- angles
@@ -802,7 +825,7 @@ public class PieChartView extends View {
                         //to change back to real time
                         alphaValueAnimator.start();
                     }
-                    initStaticChartElements(mainBGRectF,sectors,dateSize);
+                    initStaticChartElements(mainBGRectF,sectors);
                 }
                 //todo if clicked then handle displaying details of that sector
                 //  -time left,
@@ -830,36 +853,36 @@ public class PieChartView extends View {
         return maxSize * desiredWidth / bounds.width();
     }
 
-    private Rect clockTextMeasure = new Rect();
+    private final Rect clockTextMeasure = new Rect();
     private int maxTextHeight;
-    private float clockDigitWidth;
-    private void addClockText(Canvas c, Paint clockTextPaint, @ClockTextAlignment int alignment){
+    private float clockHourWidth;
+    private void addClockText(Canvas c, Paint clockTextPaint, @ClockAlignment int alignment){
         //add custom alignments for the text, top left right bottom center.
-        radiusOfHourDot = Math.round(outerToInnerGap*.5f); //radius of the hour 'dot' (max radius) - used as a gap
+        maxDotRadius = Math.round(outerToInnerGap*.5f); //radius of the hour 'dot' (max radius) - used as a gap
 
         paint.getTextBounds(hourText,0,hourText.length(), clockTextMeasure); //height of the hour text
         //THIS WILL KEEP THE HEIGHT SAME WHEN SIZE CHANGES
         if(clockTextMeasure.height()>maxTextHeight)
             maxTextHeight=clockTextMeasure.height();
         switch(alignment) {
-            case ClockTextAlignment.TOP: //270
-            case ClockTextAlignment.LEFT: //180
-            case ClockTextAlignment.RIGHT: //0
-                c.drawText(hourText, clockXY[0]- clockDigitWidth, clockXY[1], clockTextPaint);
-                c.drawText(minuteText, clockXY[0]- clockDigitWidth, clockXY[1]+maxTextHeight+radiusOfHourDot, clockTextPaint);
+            case ClockAlignment.TOP: //270
+            case ClockAlignment.LEFT: //180
+            case ClockAlignment.RIGHT: //0
+                c.drawText(hourText, clockXy[0]- clockHourWidth, clockXy[1], clockTextPaint);
+                c.drawText(minuteText, clockXy[0]- clockHourWidth, clockXy[1]+maxTextHeight+ maxDotRadius, clockTextPaint);
                 break;
-            case ClockTextAlignment.CENTER:
-                c.drawText(hourText, clockXY[0]- clockDigitWidth, clockXY[1], clockTextPaint);
-                c.drawText(minuteText, clockXY[1]- clockDigitWidth, clockXY[1]+ maxTextHeight+radiusOfHourDot, clockTextPaint);
+            case ClockAlignment.CENTER:
+                c.drawText(hourText, clockXy[0]- clockHourWidth, clockXy[1], clockTextPaint);
+                c.drawText(minuteText, clockXy[1]- clockHourWidth, clockXy[1]+ maxTextHeight+ maxDotRadius, clockTextPaint);
                 break;
-            case ClockTextAlignment.BOTTOM: //90
-                c.drawText(hourText, clockXY[0]- clockDigitWidth, clockXY[1] - radiusOfHourDot, clockTextPaint);
-                c.drawText(minuteText, clockXY[0]- clockDigitWidth, clockXY[1]+ maxTextHeight, clockTextPaint);
+            case ClockAlignment.BOTTOM: //90
+                c.drawText(hourText, clockXy[0]- clockHourWidth, clockXy[1] - maxDotRadius, clockTextPaint);
+                c.drawText(minuteText, clockXy[0]- clockHourWidth, clockXy[1]+ maxTextHeight, clockTextPaint);
                 break;
         }
     }
     private TextPaint sectorTextPaint;
-    private void addSectorsDetailsText(Canvas c, Sector currSector, RectF rectF, Paint p, @ClockTextAlignment int alignment){
+    private void addSectorsDetailsText(Canvas c, Sector currSector, RectF rectF, Paint p, @ClockAlignment int alignment){
         float radiusOfHourDot = Math.round(outerToInnerGap/2f); //radius of the hour 'dot' (max radius)
         p.setTextSize(.06f*rectF.width());
         p.setColor(topColour);
@@ -886,7 +909,7 @@ public class PieChartView extends View {
         Rect rect = new Rect();
         p.getTextBounds(time,0,time.length(),rect);
         switch (alignment){
-            case ClockTextAlignment.TOP:
+            case ClockAlignment.TOP:
                 //bottom, left , right
                 /* Sector name */
                 c.drawText(currSec, xy[0]-p.measureText(currSec)*.5f,
@@ -896,7 +919,7 @@ public class PieChartView extends View {
                 c.drawText(time, xy[0]-p.measureText(time)*.5f,
                         xy[1]+rect.height()+radiusOfHourDot, p);
                 break;
-            case ClockTextAlignment.CENTER:
+            case ClockAlignment.CENTER:
                 break;
 //            case ClockTextAlignment.BOTTOM:
 //                break;
@@ -907,9 +930,9 @@ public class PieChartView extends View {
         }
     }
 
-    @IntDef({ClockTextAlignment.TOP, ClockTextAlignment.LEFT, ClockTextAlignment.CENTER, ClockTextAlignment.RIGHT, ClockTextAlignment.BOTTOM})
+    @IntDef({ClockAlignment.TOP, ClockAlignment.LEFT, ClockAlignment.CENTER, ClockAlignment.RIGHT, ClockAlignment.BOTTOM})
     @Retention(RetentionPolicy.SOURCE)
-    private @interface ClockTextAlignment {
+    private @interface ClockAlignment {
         int CENTER = -1;
         int TOP = 270;
         int LEFT = 180;

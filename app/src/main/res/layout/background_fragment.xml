@@ -17,7 +17,6 @@
         android:id="@+id/bgColourSelect"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:alpha="0.5"
         android:clickable="false"
         android:background="@drawable/transparent_bg">
 
@@ -45,7 +44,6 @@
         android:id="@+id/inlaidColourSelect"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:alpha="0.5"
         android:clickable="false"
         android:background="@drawable/transparent_bg">
 

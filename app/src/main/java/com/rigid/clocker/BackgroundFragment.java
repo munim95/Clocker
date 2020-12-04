@@ -83,6 +83,7 @@ public class BackgroundFragment extends Fragment {
                 }
             }else{
                 if(isChecked){
+                    //get bgcolour bitmap to get its palette
                     Bitmap bitmap = Bitmap.createBitmap(bgColour.getWidth(),bgColour.getHeight(),
                             Bitmap.Config.ARGB_8888);
                     Canvas canvas = new Canvas(bitmap);
