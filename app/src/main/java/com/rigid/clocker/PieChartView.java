@@ -6,13 +6,19 @@ import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.ColorFilter;
+import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PathMeasure;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffColorFilter;
+import android.graphics.PorterDuffXfermode;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.VectorDrawable;
 import android.text.TextPaint;
 import android.text.TextUtils;
@@ -231,13 +237,6 @@ public class PieChartView extends View {
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
-        Drawable drawable = ((VectorDrawable)getResources().getDrawable(R.drawable.ic_android_black_24dp,null));
-        Bitmap bitmap = Bitmap.createBitmap(drawable.getIntrinsicWidth(),
-                drawable.getIntrinsicHeight(), Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(bitmap);
-        drawable.setBounds(0, 0, canvas.getWidth(), canvas.getHeight());
-        drawable.draw(canvas);
-        testBmp = bitmap;
         //add text size to the left and top of rect to avoid it clipping at the edges
         //figure out the max radius it can be, taking text in to account
         //although getWidth and height will be the same, using math.min is just a precaution
@@ -489,7 +488,6 @@ public class PieChartView extends View {
         makePie(canvas, mainBGRectF);
         super.onDraw(canvas);
     }
-    private Bitmap testBmp;
     //PieChart with respect to time
     //The pie chart represents real time by shading itself as time elapses (24hrs)
     //tells us what sector the time is currently in
@@ -570,6 +568,7 @@ public class PieChartView extends View {
 //            Log.d(TAG, "ELAPSED TIME (SECONDS) " + elapsed_time + "-> ANGLE " + currTimeAngle);
             /*3. draw out clock time text in the middle*/
             canvas.restore(); //restore here so text isn't rotated as well
+
             paint.setTextSize(clockTextSize);
             paint.setColor(topColour);
 //            paint.setTextAlign(Paint.Align.CENTER);
@@ -577,10 +576,18 @@ public class PieChartView extends View {
             paint.getTextBounds("8",0,1,rect);
             float y = weatherXy[1]+rect.height()*.5f;
             canvas.drawText("8",weatherXy[0],y,paint);
-            canvas.drawBitmap(testBmp,
-                    weatherXy[0]-(testBmp.getWidth()),y-(rect.height()*.5f + testBmp.getHeight()*.5f),paint);
-            float t =testBmp.getWidth()+paint.measureText("8");
-            float x = weatherXy[0]-testBmp.getWidth();
+            GradientDrawable d = (GradientDrawable) getResources().getDrawable(R.drawable.degree_symbol,null);
+            d.setStroke((int)(strokeWidthArc*.5f),topColour);
+            d.setBounds((int)(weatherXy[0]+paint.measureText("8")),(int)(weatherXy[1]-rect.height()*.5f),
+                    (int)(weatherXy[0]+paint.measureText("8")+rect.height()*.1f),(int)((weatherXy[1]-rect.height()*.5f)+rect.height()*.1f));
+            d.draw(canvas);
+            Drawable dd = getResources().getDrawable(R.drawable.ic_android_black_24dp,null);
+            dd.setBounds((int)bgRectF.centerX(),(int)(weatherXy[1]-rect.height()*.5f),(int) weatherXy[0],(int) weatherXy[1]);
+            dd.draw(canvas);
+//            canvas.drawBitmap(testBmp,
+//                    weatherXy[0]-(testBmp.getWidth()),y-(rect.height()*.5f + testBmp.getHeight()*.5f),paint);
+            float t =dd.getBounds().width()+d.getBounds().width()+paint.measureText("8");
+            float x = (weatherXy[0]+d.getBounds().width())-dd.getBounds().width();
             paint.setTextSize(getTextSizeForWidth(paint,t,"London",clockTextSize)*.5f);
             float g = (t-paint.measureText("London"))/"London".length()-1;
             paint.getTextBounds("London",0,"London".length(),rect);
@@ -590,6 +597,7 @@ public class PieChartView extends View {
                 x+=g+paint.measureText(c+"");
             }
             paint.setTextSize(clockTextSize);
+
             if(isEditing){
                 int[] s;
                 if(alphaValueAnimator.isRunning()) {
