@@ -1,6 +1,7 @@
 package com.rigid.clocker;
 
 import android.animation.ValueAnimator;
+import android.app.WallpaperManager;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
@@ -154,7 +155,7 @@ public class PieChartView extends View {
     }
     //returns total angle
     private void isPieFull(){
-        //-1 for alpha
+        //-1 for alpha/non visible
         int s = sectors.size();
         for(int i=0; i<s; i++){
             int next = i+1;
@@ -164,13 +165,6 @@ public class PieChartView extends View {
                 }
             }
         }
-//        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-//            total = sectors.stream().mapToLong(sector -> sector.getTotalTime(CLOCK_HOUR_MODE)).sum();
-//        }else{
-//            for(Sector s: sectors){
-//                total+=s.getTotalTime(CLOCK_HOUR_MODE);
-//            }
-//        }
         long lastEnd = sectors.get(s - 1).getEndTime(); //last sectors end = breaks start time, first sectors start = breaks end time
         long start = sectors.get(0).getStartTime();
         long secs = (lastEnd-start) *60;
@@ -350,14 +344,20 @@ public class PieChartView extends View {
 //        paint.setStrokeWidth(strokeWidthArc/4);
 //        paint.setColor(Color.argb(getRGBAlpha(0.3f),255,255,255));
         paint.setColor(bgColour);
+//        paint.setARGB(0,0,0,0); //custom bg
         /* BG circle */
         //we are adding stroke width to radius so that the arc edges don't blend in with the wallpaper
         canvas.drawCircle(rectF.centerX(),rectF.centerY(),rectF.width()/2f+strokeWidthArc,paint);
 
-        /* Custom BG bitmap (TEST)*/
+        /* Custom BG bitmap */
 //        paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_IN));
-//        Bitmap bmptest = ((BitmapDrawable)WallpaperManager.getInstance(getContext()).getDrawable()).getBitmap();
-//        canvas.drawBitmap(bmptest,0,0,paint);
+//        Bitmap bmptest = ((BitmapDrawable) WallpaperManager.getInstance(getContext()).getDrawable()).getBitmap();
+//        //create a copy of the rectF with the new radius (We don't change the original to keep the interior elements in proportion)
+//        RectF rectF1 = new RectF(rectF.left-strokeWidthArc,rectF.top-strokeWidthArc,
+//                rectF.right+strokeWidthArc,rectF.bottom+strokeWidthArc);
+//        Matrix m = new Matrix();
+//        m.setRectToRect(new RectF(0,0,bmptest.getWidth(),bmptest.getHeight()),rectF1, Matrix.ScaleToFit.FILL);
+//        canvas.drawBitmap(bmptest,m,paint);
 //        paint.reset();
         /*----lay down the clock numbers----*/
         paint.setStyle(Paint.Style.FILL);
@@ -499,6 +499,7 @@ public class PieChartView extends View {
     //  ARGB values in paint moddable by the user
 
     // TODO: 08/11/2020
+    //  FIND THINGS THAT CAN BE STATIC AND INCLUDE THEM IN STATIC METHOD ABOVE
     //  ALARMS, REMINDERS
     //  MEDIUM:
     //  -WIDGET - time cursor should not be transparent
@@ -585,13 +586,14 @@ public class PieChartView extends View {
             degreeIcon.setBounds((int)(weatherXy[0]+paint.measureText("8")),(int)(weatherXy[1]-rect.height()),
                     (int)(weatherXy[0]+paint.measureText("8")+rect.height()*.1f),(int)((weatherXy[1]-rect.height())+rect.height()*.1f));
             degreeIcon.draw(canvas);
+            //fetched from weather api
             Drawable weatherIcon = getResources().getDrawable(R.drawable.ic_android_black_24dp,null);
             weatherIcon.setBounds((int)bgRectF.centerX(),(int)(weatherXy[1]-rect.height()),(int) weatherXy[0],(int) weatherXy[1]);
             weatherIcon.draw(canvas);
         float totalWidth =weatherIcon.getBounds().width()+degreeIcon.getBounds().width()+paint.measureText("8");
             float x = (weatherXy[0]+degreeIcon.getBounds().width())-weatherIcon.getBounds().width();
             paint.setTextSize(getMaxTextSizeForWidth(paint,totalWidth,"Birmingham",clockTextSize)*.5f);
-            paint.getTextBounds("Birmingham",0,"Birmingham".length(),rect); //city bounds
+            paint.getTextBounds("Birmingham",0,"Birmingham".length(),rect); //city label bounds
             drawTextAlongWidth(canvas,"Birmingham",x,y+rect.height(),totalWidth,paint);
             paint.setTextSize(clockTextSize);
 

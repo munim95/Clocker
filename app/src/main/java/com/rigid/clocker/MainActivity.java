@@ -174,9 +174,9 @@ public class MainActivity extends AppCompatActivity {
         //to avoid keyboard pushing up the view hierarchy
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING);
 
-        Drawable bgDrawable = WallpaperManager.getInstance(this).getDrawable();
-        if(bgDrawable!=null)
-            motionLayout.setBackground(bgDrawable);
+//        Drawable bgDrawable = WallpaperManager.getInstance(this).getDrawable();
+//        if(bgDrawable!=null)
+//            motionLayout.setBackground(bgDrawable);
         pieChartView.runClockThread();
         //disable widget thread while activity is running
         suspendWidget(true);
