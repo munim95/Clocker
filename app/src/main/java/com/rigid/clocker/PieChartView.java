@@ -294,7 +294,7 @@ public class PieChartView extends View {
             Path pathStamp = new Path();
 
             //reason for opting for manual over pathDashPathEffect -
-            // 1. draw called unnecessarily for stamps where not needed and no way to tweak that
+            // 1. draw called unnecessarily for stamps where not needed
             // 2. subsequently that also results in better performance
             float startTimeAngle = 0f;
             float tenMinutely = hourGapAngle/6; //divide in to six points between hours representing 10 min
@@ -343,22 +343,22 @@ public class PieChartView extends View {
         paint.setStyle(Paint.Style.FILL);
 //        paint.setStrokeWidth(strokeWidthArc/4);
 //        paint.setColor(Color.argb(getRGBAlpha(0.3f),255,255,255));
-        paint.setColor(bgColour);
-//        paint.setARGB(0,0,0,0); //custom bg
+//        paint.setColor(bgColour);
+//        paint.setARGB(0,255,255,255); //custom bg
         /* BG circle */
         //we are adding stroke width to radius so that the arc edges don't blend in with the wallpaper
         canvas.drawCircle(rectF.centerX(),rectF.centerY(),rectF.width()/2f+strokeWidthArc,paint);
 
         /* Custom BG bitmap */
-//        paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_IN));
-//        Bitmap bmptest = ((BitmapDrawable) WallpaperManager.getInstance(getContext()).getDrawable()).getBitmap();
-//        //create a copy of the rectF with the new radius (We don't change the original to keep the interior elements in proportion)
-//        RectF rectF1 = new RectF(rectF.left-strokeWidthArc,rectF.top-strokeWidthArc,
-//                rectF.right+strokeWidthArc,rectF.bottom+strokeWidthArc);
-//        Matrix m = new Matrix();
-//        m.setRectToRect(new RectF(0,0,bmptest.getWidth(),bmptest.getHeight()),rectF1, Matrix.ScaleToFit.FILL);
-//        canvas.drawBitmap(bmptest,m,paint);
-//        paint.reset();
+        paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_IN));
+        Bitmap bmptest = ((BitmapDrawable) WallpaperManager.getInstance(getContext()).getDrawable()).getBitmap();
+        //create a copy of the rectF with the new radius (We don't change the original to keep the interior elements in proportion)
+        RectF rectF1 = new RectF(rectF.left-strokeWidthArc,rectF.top-strokeWidthArc,
+                rectF.right+strokeWidthArc,rectF.bottom+strokeWidthArc);
+        Matrix m = new Matrix();
+        m.setRectToRect(new RectF(0,0,bmptest.getWidth(),bmptest.getHeight()),rectF1, Matrix.ScaleToFit.FILL);
+        canvas.drawBitmap(bmptest,m,paint);
+        paint.reset();
         /*----lay down the clock numbers----*/
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(topColour);

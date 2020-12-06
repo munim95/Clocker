@@ -24,9 +24,9 @@ public class ClockerWidgetProvider extends AppWidgetProvider {
     private static final String WIDGET_THREAD_NAME = "ClockerWidgetThread";
     private static final String TAG = ClockerWidgetProvider.class.getName();
     private PieChartView pieChartView;
-    private Bitmap canvasBtmp,
-                    oldWallBtmp=null;
+    private Bitmap canvasBtmp;
     private Handler minutelyHandler;
+    private boolean isRunning = false;
     //    private AlarmManager am;
 
     public ClockerWidgetProvider() {
@@ -67,12 +67,12 @@ public class ClockerWidgetProvider extends AppWidgetProvider {
             }
         };
     }
-    //todo oldBtmp might still be null on the next cycle since its async
     private void checkWallpaperChanged(Context context,AppWidgetManager awm, ComponentName cn) {
         WallpaperManager wallpaperManager = WallpaperManager.getInstance(context);
         Bitmap newWallBtmp = ((BitmapDrawable) wallpaperManager.getDrawable()).getBitmap();
         //we are comparing the two bitmaps here so we only call this when needed
-        if (newWallBtmp!=null && (oldWallBtmp == null || !newWallBtmp.sameAs(oldWallBtmp))) {
+        if (!isRunning && newWallBtmp!=null) {
+            isRunning = true;
             //wall has changed
             Palette.from(newWallBtmp).generate(palette -> {
                 if (palette != null) {
@@ -84,8 +84,8 @@ public class ClockerWidgetProvider extends AppWidgetProvider {
                         onUpdate(context,awm,awm.getAppWidgetIds(cn));
                     }
                 }
+                isRunning=false;
             });
-            oldWallBtmp = newWallBtmp;
         }
 
     }
@@ -128,8 +128,8 @@ public class ClockerWidgetProvider extends AppWidgetProvider {
             pieChartView=new PieChartView(context);
         //bitmap memory should not exceed ((screen w * h) * 4 bytes (ARGB_8888) * 1.5)
         // --hence we divide shortest screen size by 4 to stay in safe zone
-        int displaySize = Resources.getSystem().getDisplayMetrics().widthPixels<Resources.getSystem().getDisplayMetrics().heightPixels?
-                Resources.getSystem().getDisplayMetrics().widthPixels/2:Resources.getSystem().getDisplayMetrics().heightPixels/2;
+        int displaySize = Math.min(Resources.getSystem().getDisplayMetrics().widthPixels,
+                Resources.getSystem().getDisplayMetrics().heightPixels)/2;
         pieChartView.measure(displaySize,
                 displaySize);
         pieChartView.layout(0,0,displaySize,displaySize);
