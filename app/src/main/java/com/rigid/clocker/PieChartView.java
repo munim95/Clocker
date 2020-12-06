@@ -6,20 +6,17 @@ import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.ColorFilter;
 import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PathMeasure;
 import android.graphics.PorterDuff;
-import android.graphics.PorterDuffColorFilter;
 import android.graphics.PorterDuffXfermode;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
-import android.graphics.drawable.VectorDrawable;
 import android.text.TextPaint;
 import android.text.TextUtils;
 import android.util.AttributeSet;
@@ -60,7 +57,6 @@ public class PieChartView extends View {
      *  - Focus mode where phone functionality can be limited and cant be used until a set time (apart from calls etc)
      * The sectors represent the time assigned respectively to the goals.
      * Total time of the sectors equals the total time in a day i.e 24hrs
-     * Goals Clock - Sectors are greyed out as time progresses
      * Quadrant = 6 hrs (24hrs)/ 3 hrs (12hrs)
      * Customizable PieChart - User can determine sectors colours, add an image to a sector (clipped in), enable/disable Goals Clock...
      * *
@@ -113,7 +109,7 @@ public class PieChartView extends View {
     private float currentSectorEndAngle =0;
     private boolean checkCurrentSector =false;
     private int clockAlignmentPresets = ClockAlignment.LEFT;
-    private int datePresets = DateStylePresets.RIGHT_P3;
+    private int datePresets = DateStylePresets.BOTTOM_P2;
     private float animatedAlphaValue =1;
     private ValueAnimator alphaValueAnimator;
     private Thread clockerTimeThread;
@@ -149,7 +145,7 @@ public class PieChartView extends View {
         sectors.add(new Sector("Bla2",120,240,Color.BLUE));//2-4
         sectors.add(new Sector("Bla3",240,300,Color.GREEN));//4-5
         sectors.add(new Sector("Bla4",300,360,Color.BLUE));//5-7
-        sectors.add(new Sector("Bla5",400,460,Color.RED));//5-7
+        sectors.add(new Sector("Bla5",400,460,Color.RED));
 //        sectors.add(new Sector("Bla5",420,1080,Color.CYAN));//7-18 (24 only test)
 
         //todo upon user permission
@@ -357,6 +353,12 @@ public class PieChartView extends View {
         /* BG circle */
         //we are adding stroke width to radius so that the arc edges don't blend in with the wallpaper
         canvas.drawCircle(rectF.centerX(),rectF.centerY(),rectF.width()/2f+strokeWidthArc,paint);
+
+        /* Custom BG bitmap (TEST)*/
+//        paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_IN));
+//        Bitmap bmptest = ((BitmapDrawable)WallpaperManager.getInstance(getContext()).getDrawable()).getBitmap();
+//        canvas.drawBitmap(bmptest,0,0,paint);
+//        paint.reset();
         /*----lay down the clock numbers----*/
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(topColour);
@@ -572,32 +574,28 @@ public class PieChartView extends View {
             paint.setTextSize(clockTextSize);
             paint.setColor(topColour);
 //            paint.setTextAlign(Paint.Align.CENTER);
+
+        /* --- WEATHER DISPLAY --- */
             Rect rect = new Rect();
-            paint.getTextBounds("8",0,1,rect);
-            float y = weatherXy[1]+rect.height()*.5f;
+            paint.getTextBounds("8",0,1,rect); // temperature bounds
+            float y = weatherXy[1];
             canvas.drawText("8",weatherXy[0],y,paint);
-            GradientDrawable d = (GradientDrawable) getResources().getDrawable(R.drawable.degree_symbol,null);
-            d.setStroke((int)(strokeWidthArc*.5f),topColour);
-            d.setBounds((int)(weatherXy[0]+paint.measureText("8")),(int)(weatherXy[1]-rect.height()*.5f),
-                    (int)(weatherXy[0]+paint.measureText("8")+rect.height()*.1f),(int)((weatherXy[1]-rect.height()*.5f)+rect.height()*.1f));
-            d.draw(canvas);
-            Drawable dd = getResources().getDrawable(R.drawable.ic_android_black_24dp,null);
-            dd.setBounds((int)bgRectF.centerX(),(int)(weatherXy[1]-rect.height()*.5f),(int) weatherXy[0],(int) weatherXy[1]);
-            dd.draw(canvas);
-//            canvas.drawBitmap(testBmp,
-//                    weatherXy[0]-(testBmp.getWidth()),y-(rect.height()*.5f + testBmp.getHeight()*.5f),paint);
-            float t =dd.getBounds().width()+d.getBounds().width()+paint.measureText("8");
-            float x = (weatherXy[0]+d.getBounds().width())-dd.getBounds().width();
-            paint.setTextSize(getTextSizeForWidth(paint,t,"London",clockTextSize)*.5f);
-            float g = (t-paint.measureText("London"))/"London".length()-1;
-            paint.getTextBounds("London",0,"London".length(),rect);
-            for(int i=0;i<"London".length(); i++){
-                char c  = "London".charAt(i);
-                canvas.drawText(c+"",x,y+rect.height(),paint);
-                x+=g+paint.measureText(c+"");
-            }
+            GradientDrawable degreeIcon = (GradientDrawable) getResources().getDrawable(R.drawable.degree_symbol,null);
+            degreeIcon.setStroke((int)(strokeWidthArc*.5f),topColour);
+            degreeIcon.setBounds((int)(weatherXy[0]+paint.measureText("8")),(int)(weatherXy[1]-rect.height()),
+                    (int)(weatherXy[0]+paint.measureText("8")+rect.height()*.1f),(int)((weatherXy[1]-rect.height())+rect.height()*.1f));
+            degreeIcon.draw(canvas);
+            Drawable weatherIcon = getResources().getDrawable(R.drawable.ic_android_black_24dp,null);
+            weatherIcon.setBounds((int)bgRectF.centerX(),(int)(weatherXy[1]-rect.height()),(int) weatherXy[0],(int) weatherXy[1]);
+            weatherIcon.draw(canvas);
+        float totalWidth =weatherIcon.getBounds().width()+degreeIcon.getBounds().width()+paint.measureText("8");
+            float x = (weatherXy[0]+degreeIcon.getBounds().width())-weatherIcon.getBounds().width();
+            paint.setTextSize(getMaxTextSizeForWidth(paint,totalWidth,"Birmingham",clockTextSize)*.5f);
+            paint.getTextBounds("Birmingham",0,"Birmingham".length(),rect); //city bounds
+            drawTextAlongWidth(canvas,"Birmingham",x,y+rect.height(),totalWidth,paint);
             paint.setTextSize(clockTextSize);
 
+            /* Animation handling and clock text*/
             if(isEditing){
                 int[] s;
                 if(alphaValueAnimator.isRunning()) {
@@ -637,7 +635,14 @@ public class PieChartView extends View {
             }
 
 //        }
-
+    }
+    private void drawTextAlongWidth(Canvas canvas, String text,float x, float y, float desired,Paint p){
+        float g = (desired-p.measureText(text))/(text.length()-1);
+        for(int i=0;i<text.length(); i++){
+            char c  = text.charAt(i);
+            canvas.drawText(c+"",x,y,p);
+            x+=g+p.measureText(c+"");
+        }
     }
     private void findSectorForAngle(float sweep_time_angle){
         if(currSector==null) {
@@ -870,8 +875,8 @@ public class PieChartView extends View {
         return true;
     }
     // spans the text over the desired width
-    private float getTextSizeForWidth(Paint paint, float desiredWidth,
-                                      String text, float maxSize) {
+    private float getMaxTextSizeForWidth(Paint paint, float desiredWidth,
+                                         String text, float maxSize) {
 
 //        // Pick a reasonably large value for the test. Larger values produce
 //        // more accurate results, but may cause problems with hardware

@@ -96,7 +96,7 @@ public class HueSlider extends View implements HexChangedInterface{
         final Rect rect = new Rect(0, 0, bitmap.getWidth(), bitmap.getHeight());
         final RectF rectF = new RectF(rect);
 
-        // prepare canvas for transfer
+        // prepare canvas for transfer -- draw the cornered rect and then apply porter duff to clip
         paint.setColor(0xFFFFFFFF);
         paint.setStyle(Paint.Style.FILL);
         canvas.drawARGB(0, 0, 0, 0);
