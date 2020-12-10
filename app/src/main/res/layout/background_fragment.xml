@@ -12,27 +12,53 @@
         android:checked="true"
         android:padding="3dp"
         android:text="Blend background with wallpaper"/>
-
-    <FrameLayout
-        android:id="@+id/bgColourSelect"
+    <RadioGroup
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:clickable="false"
-        android:background="@drawable/transparent_bg">
+        android:orientation="vertical">
+        <RadioButton
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Background Colour"/>
 
         <FrameLayout
-            android:id="@+id/bgColour"
+            android:id="@+id/bgColourSelect"
             android:layout_width="match_parent"
-            android:layout_height="50dp"
-            android:orientation="horizontal"
-            android:background="#50000000"/>
-        <TextView
-            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:padding="3dp"
-            android:text="Background colour"
-            android:background="#fff" />
-    </FrameLayout>
+            android:clickable="false"
+            android:background="@drawable/transparent_bg">
+
+            <FrameLayout
+                android:id="@+id/bgColour"
+                android:layout_width="match_parent"
+                android:layout_height="50dp"
+                android:orientation="horizontal"
+                android:background="#50000000"/>
+        </FrameLayout>
+        <RadioButton
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Custom image"/>
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <Button
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="browse"/>
+
+            <TextView
+                android:layout_weight="1"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:gravity="center"
+                android:text="test.png"/>
+        </LinearLayout>
+    </RadioGroup>
+
     <androidx.appcompat.widget.SwitchCompat
         android:id="@+id/inlaidAdjustSwitch"
         android:layout_width="match_parent"

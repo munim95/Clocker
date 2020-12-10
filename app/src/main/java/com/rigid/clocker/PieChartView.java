@@ -355,11 +355,11 @@ public class PieChartView extends View {
         paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_IN));
         Bitmap bmptest = ((BitmapDrawable) WallpaperManager.getInstance(getContext()).getDrawable()).getBitmap();
 
-        //create a copy of the rectF with the new radius (We don't change the original to keep the interior elements in proportion)
-        RectF rectF1 = new RectF(rectF.left-strokeWidthArc,rectF.top-strokeWidthArc,
+        //create a copy of the rectF with the radius of the entire circle (We don't change the original RectF to keep the interior elements in proportion)
+        RectF circleRectF = new RectF(rectF.left-strokeWidthArc,rectF.top-strokeWidthArc,
                 rectF.right+strokeWidthArc,rectF.bottom+strokeWidthArc);
         Matrix m = new Matrix();
-        m.setRectToRect(new RectF(0,0,bmptest.getWidth(),bmptest.getHeight()),rectF1, Matrix.ScaleToFit.FILL);
+        m.setRectToRect(new RectF(0,0,bmptest.getWidth(),bmptest.getHeight()),circleRectF, Matrix.ScaleToFit.FILL);
         canvas.drawBitmap(bmptest,m,paint);
         paint.reset();
         //synchronous
