@@ -25,7 +25,7 @@ public class ClockerWidgetProvider extends AppWidgetProvider {
     private static final String TAG = ClockerWidgetProvider.class.getName();
     private PieChartView pieChartView;
     private Bitmap canvasBtmp;
-    private Handler minutelyHandler;
+    private Handler minutelyHandler; //runs on UI thread
     private boolean isRunning = false;
     //    private AlarmManager am;
 

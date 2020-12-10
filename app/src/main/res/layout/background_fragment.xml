@@ -13,12 +13,16 @@
         android:padding="3dp"
         android:text="Blend background with wallpaper"/>
     <RadioGroup
+        android:id="@+id/bgRadioGroup"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:alpha="0.5"
         android:orientation="vertical">
         <RadioButton
+            android:id="@+id/bgColourRadio"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:enabled="false"
             android:text="Background Colour"/>
 
         <FrameLayout
@@ -32,30 +36,34 @@
                 android:id="@+id/bgColour"
                 android:layout_width="match_parent"
                 android:layout_height="50dp"
-                android:orientation="horizontal"
-                android:background="#50000000"/>
+                android:orientation="horizontal"/>
         </FrameLayout>
         <RadioButton
+            android:id="@+id/customImageRadio"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:enabled="false"
             android:text="Custom image"/>
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal">
             <Button
+                android:id="@+id/browseImage"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:enabled="false"
                 android:text="browse"/>
 
             <TextView
+                android:id="@+id/browseImageName"
                 android:layout_weight="1"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:maxLines="1"
                 android:ellipsize="end"
                 android:gravity="center"
-                android:text="test.png"/>
+                android:text="Nothing Selected"/>
         </LinearLayout>
     </RadioGroup>
 
@@ -71,14 +79,14 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:clickable="false"
+        android:alpha="0.5"
         android:background="@drawable/transparent_bg">
 
         <FrameLayout
             android:id="@+id/inlaidColour"
             android:layout_width="match_parent"
             android:layout_height="50dp"
-            android:orientation="horizontal"
-            android:background="#50000000"/>
+            android:orientation="horizontal" />
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
