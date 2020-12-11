@@ -34,7 +34,6 @@ public class BackgroundFragment extends Fragment {
     private SwitchCompat wallpaperBlend, inlaidAdjust;
     private FrameLayout bgColourSelect, inlaidColourSelect,bgColour,inlaidColour;
     private RadioGroup bgRadioGroup;
-    private boolean inlaidCheckedFromBgSwitch =false;
     private Bitmap oldWallBmp;
     private RadioButton bgColourRadio, customImgRadio;
     private Button browse;
@@ -79,13 +78,11 @@ public class BackgroundFragment extends Fragment {
         bgRadioGroup.check(bgColourRadio.getId());
 
         browse.setOnClickListener(v1 -> {
-            //file picker then
             Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
             intent.addCategory(Intent.CATEGORY_OPENABLE);
             intent.setType("image/*");
 
             startActivityForResult(intent,0);
-
         });
         return v;
     }
@@ -94,6 +91,7 @@ public class BackgroundFragment extends Fragment {
     @Override
     public void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         if(data!=null) {
+//            ((MainActivity)getActivity()).updateView(data.getData(),bgColour,inlaidColour);
             if(thread==null)
                 thread=new Thread(()->{
                     try {
@@ -102,7 +100,9 @@ public class BackgroundFragment extends Fragment {
                         FileDescriptor fileDescriptor = parcelFileDescriptor.getFileDescriptor();
                         image = BitmapFactory.decodeFileDescriptor(fileDescriptor);
                         parcelFileDescriptor.close();
-                        
+
+
+                        //stop thread
                         Thread.currentThread().interrupt();
                     }catch (Exception e){}
                 });
@@ -131,26 +131,24 @@ public class BackgroundFragment extends Fragment {
                         }
                     });
                     //disabled look
-                    bgRadioGroup.setAlpha(0.5f);
+//                    bgRadioGroup.setAlpha(0.5f);
+                    bgColourSelect.setClickable(false);
                     bgColourRadio.setEnabled(false);
                     customImgRadio.setEnabled(false);
 
-                    inlaidCheckedFromBgSwitch =true;
-                    inlaidAdjust.setChecked(true);
                 }else{
-                    bgRadioGroup.setAlpha(1f);
+                    bgColourSelect.setClickable(true);
                     bgColourRadio.setEnabled(true);
                     customImgRadio.setEnabled(true);
                 }
             }else{
                 if(isChecked){
-                    if(!inlaidCheckedFromBgSwitch) {
                         if (oldWallBmp==null || !oldWallBmp.sameAs(((BitmapDrawable) WallpaperManager.getInstance(getContext()).getDrawable()).getBitmap())) {
                             //get bgcolour bitmap to get its palette
                             Bitmap bitmap = Bitmap.createBitmap(bgColour.getWidth(), bgColour.getHeight(),
                                     Bitmap.Config.ARGB_8888);
                             Canvas canvas = new Canvas(bitmap);
-                            canvas.drawColor(((ColorDrawable) bgColour.getBackground()).getColor());
+                            bgColour.getBackground().draw(canvas);
                             Palette.from(bitmap).generate(palette -> {
                                 if (palette != null) {
                                     Palette.Swatch swatch = palette.getDominantSwatch();
@@ -160,13 +158,8 @@ public class BackgroundFragment extends Fragment {
                                 }
                             });
                         }
-                    }
-                    inlaidColourSelect.setAlpha(0.5f);
                     inlaidColourSelect.setClickable(false);
-
-                    inlaidCheckedFromBgSwitch =false;
                 }else{
-                    inlaidColourSelect.setAlpha(1f);
                     inlaidColourSelect.setClickable(true);
                 }
             }

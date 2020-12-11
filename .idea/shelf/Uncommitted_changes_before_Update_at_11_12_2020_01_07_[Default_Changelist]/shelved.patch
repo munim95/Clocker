@@ -1,0 +1,62 @@
+Index: app/src/main/res/layout/background_fragment.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+><?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n<LinearLayout\r\n    xmlns:android=\"http://schemas.android.com/apk/res/android\"\r\n    android:layout_width=\"match_parent\"\r\n    android:layout_height=\"match_parent\"\r\n    android:orientation=\"vertical\">\r\n\r\n    <androidx.appcompat.widget.SwitchCompat\r\n        android:id=\"@+id/wallpaperBlendSwitch\"\r\n        android:layout_width=\"match_parent\"\r\n        android:layout_height=\"wrap_content\"\r\n        android:checked=\"true\"\r\n        android:padding=\"3dp\"\r\n        android:text=\"Blend background with wallpaper\"/>\r\n    <RadioGroup\r\n        android:layout_width=\"match_parent\"\r\n        android:layout_height=\"wrap_content\"\r\n        android:orientation=\"vertical\">\r\n        <RadioButton\r\n            android:layout_width=\"match_parent\"\r\n            android:layout_height=\"wrap_content\"\r\n            android:text=\"Background Colour\"/>\r\n\r\n        <FrameLayout\r\n            android:id=\"@+id/bgColourSelect\"\r\n            android:layout_width=\"match_parent\"\r\n            android:layout_height=\"wrap_content\"\r\n            android:clickable=\"false\"\r\n            android:background=\"@drawable/transparent_bg\">\r\n\r\n            <FrameLayout\r\n                android:id=\"@+id/bgColour\"\r\n                android:layout_width=\"match_parent\"\r\n                android:layout_height=\"50dp\"\r\n                android:orientation=\"horizontal\"\r\n                android:background=\"#50000000\"/>\r\n        </FrameLayout>\r\n        <RadioButton\r\n            android:layout_width=\"match_parent\"\r\n            android:layout_height=\"wrap_content\"\r\n            android:text=\"Custom image\"/>\r\n        <LinearLayout\r\n            android:layout_width=\"match_parent\"\r\n            android:layout_height=\"wrap_content\"\r\n            android:orientation=\"horizontal\">\r\n            <Button\r\n                android:layout_width=\"wrap_content\"\r\n                android:layout_height=\"wrap_content\"\r\n                android:text=\"browse\"/>\r\n\r\n            <TextView\r\n                android:layout_weight=\"1\"\r\n                android:layout_width=\"0dp\"\r\n                android:layout_height=\"match_parent\"\r\n                android:maxLines=\"1\"\r\n                android:ellipsize=\"end\"\r\n                android:gravity=\"center\"\r\n                android:text=\"test.png\"/>\r\n        </LinearLayout>\r\n    </RadioGroup>\r\n\r\n    <androidx.appcompat.widget.SwitchCompat\r\n        android:id=\"@+id/inlaidAdjustSwitch\"\r\n        android:layout_width=\"match_parent\"\r\n        android:layout_height=\"wrap_content\"\r\n        android:padding=\"3dp\"\r\n        android:checked=\"true\"\r\n        android:text=\"Adjust inlaid to background\"/>\r\n    <FrameLayout\r\n        android:id=\"@+id/inlaidColourSelect\"\r\n        android:layout_width=\"match_parent\"\r\n        android:layout_height=\"wrap_content\"\r\n        android:clickable=\"false\"\r\n        android:background=\"@drawable/transparent_bg\">\r\n\r\n        <FrameLayout\r\n            android:id=\"@+id/inlaidColour\"\r\n            android:layout_width=\"match_parent\"\r\n            android:layout_height=\"50dp\"\r\n            android:orientation=\"horizontal\"\r\n            android:background=\"#50000000\"/>\r\n        <TextView\r\n            android:layout_width=\"wrap_content\"\r\n            android:layout_height=\"wrap_content\"\r\n            android:padding=\"3dp\"\r\n            android:text=\"Inlaid colour\"\r\n            android:background=\"#fff\" />\r\n    </FrameLayout>\r\n\r\n</LinearLayout>
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- app/src/main/res/layout/background_fragment.xml	(revision b7ac0476089bbf9f39e3866e23acc996e20c11c2)
++++ app/src/main/res/layout/background_fragment.xml	(date 1607562025369)
+@@ -13,10 +13,13 @@
+         android:padding="3dp"
+         android:text="Blend background with wallpaper"/>
+     <RadioGroup
++        android:id="@+id/bgRadioGroup"
+         android:layout_width="match_parent"
+         android:layout_height="wrap_content"
++        android:alpha="0.3f"
+         android:orientation="vertical">
+         <RadioButton
++            android:id="@+id/bgColourRadio"
+             android:layout_width="match_parent"
+             android:layout_height="wrap_content"
+             android:text="Background Colour"/>
+@@ -36,6 +39,7 @@
+                 android:background="#50000000"/>
+         </FrameLayout>
+         <RadioButton
++            android:id="@+id/customImageRadio"
+             android:layout_width="match_parent"
+             android:layout_height="wrap_content"
+             android:text="Custom image"/>
+@@ -44,18 +48,21 @@
+             android:layout_height="wrap_content"
+             android:orientation="horizontal">
+             <Button
++                android:id="@+id/customImageBrowse"
+                 android:layout_width="wrap_content"
+                 android:layout_height="wrap_content"
++                android:enabled="false"
+                 android:text="browse"/>
+ 
+             <TextView
++                android:id="@+id/customImageName"
+                 android:layout_weight="1"
+                 android:layout_width="0dp"
+                 android:layout_height="match_parent"
+                 android:maxLines="1"
+                 android:ellipsize="end"
+                 android:gravity="center"
+-                android:text="test.png"/>
++                android:text="None Selected"/>
+         </LinearLayout>
+     </RadioGroup>
+ 
+@@ -70,6 +77,7 @@
+         android:id="@+id/inlaidColourSelect"
+         android:layout_width="match_parent"
+         android:layout_height="wrap_content"
++        android:alpha="0.3f"
+         android:clickable="false"
+         android:background="@drawable/transparent_bg">
+ 

@@ -16,7 +16,6 @@
         android:id="@+id/bgRadioGroup"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:alpha="0.5"
         android:orientation="vertical">
         <RadioButton
             android:id="@+id/bgColourRadio"
@@ -79,7 +78,6 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:clickable="false"
-        android:alpha="0.5"
         android:background="@drawable/transparent_bg">
 
         <FrameLayout

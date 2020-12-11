@@ -850,7 +850,7 @@ public class PieChartView extends View {
                                 !set?Math.max(newTime,affectedSector.getEndTime()):Math.min(newTime,endTime-MIN_SECTOR_TIME):
                                 affectedSector.getEndTime()>startTime?
                                 !set?Math.min(Math.min(newTime,endTime-MIN_SECTOR_TIME),affectedSector.getEndTime()):Math.max(newTime,affectedSector.getEndTime()):
-                                Math.max(newTime,affectedSector.getEndTime()));
+                                Math.max(Math.min(newTime,endTime-MIN_SECTOR_TIME),affectedSector.getEndTime()));
 //                        if(limiter) {
 //                            selectedSector.setStartTime(newTime);
 ////                            affectedSector.setEndTime(newTime); //prev sector
@@ -862,7 +862,7 @@ public class PieChartView extends View {
                                 !set?Math.min(newTime,affectedSector.getStartTime()):Math.max(newTime,startTime+MIN_SECTOR_TIME):
                                 affectedSector.getStartTime()<endTime?
                                         !set?Math.max(Math.max(newTime,startTime+MIN_SECTOR_TIME),affectedSector.getStartTime()):Math.min(newTime,affectedSector.getStartTime()):
-                                        Math.min(newTime,affectedSector.getStartTime()));
+                                        Math.min(Math.max(newTime,startTime+MIN_SECTOR_TIME),affectedSector.getStartTime()));
 //                        if(limiter) {
 //                            selectedSector.setEndTime(newTime);
 ////                            affectedSector.setStartTime(newTime); //next sector
