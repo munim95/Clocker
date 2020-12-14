@@ -4,6 +4,8 @@ import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -13,11 +15,13 @@ import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
+import androidx.preference.PreferenceManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.rigid.clocker.colourpicker.ColourPickerDialog;
@@ -78,6 +82,9 @@ public class SectorsAdapter extends RecyclerView.Adapter {
     @Override
     public void onViewDetachedFromWindow(@NonNull RecyclerView.ViewHolder holder) {
         super.onViewDetachedFromWindow(holder);
+        if(holder instanceof SectorsViewHolder){
+            ((SectorsViewHolder) holder).sectorName.removeTextChangedListener((SectorsViewHolder) holder);
+        }
     }
 
     class SectorGroupViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener {
@@ -154,7 +161,11 @@ public class SectorsAdapter extends RecyclerView.Adapter {
                 // add sector
                 //todo sectors to be arranged according to time
                 //add sectors to data then notify
-                Sector sector = new Sector("LOL TEST",20,120, Color.RED);
+                String defaultedName="Task 1";
+                if(!sectorGroup.getSectorList().isEmpty()){
+                    defaultedName="Task "+(sectorGroup.getSectorList().size()+1)+"";
+                }
+                Sector sector = new Sector(defaultedName,0,0, Color.RED);
                 sector.setGroupId(sectorGroup.getGroupId());
                 sectorGroup.getSectorList().add(sector);
                 groupInfo.setText(sectorGroup.getGroupInfo());
@@ -175,7 +186,7 @@ public class SectorsAdapter extends RecyclerView.Adapter {
             }
         }
     }
-    class SectorsViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener {
+    class SectorsViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener, TextWatcher {
         private TextView sectorInfo;
         private EditText sectorName;
         private View sectorColourImage;
@@ -183,6 +194,7 @@ public class SectorsAdapter extends RecyclerView.Adapter {
         private LinearLayout sectorInfoDetails;
         private TextView startHourText, startMinText,
                 endHourText,endMinText;
+        private RadioGroup startGroup,endGroup;
         SectorsViewHolder(@NonNull View itemView) {
             super(itemView);
             sectorInfo = itemView.findViewById(R.id.sectorInfo);
@@ -190,6 +202,16 @@ public class SectorsAdapter extends RecyclerView.Adapter {
             sectorName = itemView.findViewById(R.id.sectorName);
             sectorColourImage = itemView.findViewById(R.id.sectorColourImage);
             deleteSectorBtn = itemView.findViewById(R.id.deleteSector);
+            startGroup = itemView.findViewById(R.id.startTimerAmPmGroup);
+            endGroup = itemView.findViewById(R.id.endTimerAmPmGroup);
+            boolean a = Integer.parseInt(PreferenceManager.getDefaultSharedPreferences(itemView.getContext()).getString("clockmode","24"))==12;
+            startGroup.setVisibility(a?
+                    View.VISIBLE:
+                    View.GONE);
+            endGroup.setVisibility(a?
+                    View.VISIBLE:
+                    View.GONE);
+//            startGroup.getCheckedRadioButtonId()
 
             startHourText=itemView.findViewById(R.id.startHourTimerText);
             startMinText=itemView.findViewById(R.id.startMinTimerText);
@@ -208,6 +230,8 @@ public class SectorsAdapter extends RecyclerView.Adapter {
             itemView.findViewById(R.id.endHourDownBtn).setOnClickListener(this);
             itemView.findViewById(R.id.endMinUpBtn).setOnClickListener(this);
             itemView.findViewById(R.id.endMinDownBtn).setOnClickListener(this);
+
+            sectorName.addTextChangedListener(this);
         }
         private void bind(int position){
             Sector sector = (Sector) data.get(position);
@@ -218,13 +242,13 @@ public class SectorsAdapter extends RecyclerView.Adapter {
 
             int[] start = Helpers.timeConversion(sector.getStartTime()*60);
             int[] end = Helpers.timeConversion(sector.getEndTime()*60);
-            sectorInfo.setText((start[0]<10?"0"+start[0]:start[0])+":"+(start[1]<10?"0"+start[1]:start[1])+" - "+
-                    (end[0]<10?"0"+end[0]:end[0])+":"+(end[1]<10?"0"+end[1]:end[1]));
+            sectorInfo.setText(String.format("%s:%s - %s:%s",
+                    start[0] < 10 ? "0" + start[0] : start[0], start[1] < 10 ? "0" + start[1] : start[1],
+                    end[0] < 10 ? "0" + end[0] : end[0], end[1] < 10 ? "0" + end[1] : end[1]));
             startHourText.setText((start[0]<10?"0"+start[0]:start[0]+""));
             startMinText.setText((start[1]<10?"0"+start[1]:start[1]+""));
             endHourText.setText((end[0]<10?"0"+end[0]:end[0]+""));
             endMinText.setText((end[1]<10?"0"+end[1]:end[1]+""));
-
         }
 
         @Override
@@ -269,6 +293,7 @@ public class SectorsAdapter extends RecyclerView.Adapter {
                     }
                 }
             }else if(v.getId()==sectorColourImage.getId()){
+                //OPEN COLOUR DIALOG
                 ColourPickerDialog colourPickerDialog = new ColourPickerDialog(colour -> {
                     //low alpha should show a warning
                     if(Color.alpha(colour)<255*.5f)
@@ -277,7 +302,9 @@ public class SectorsAdapter extends RecyclerView.Adapter {
                     notifyItemChanged(getAdapterPosition());
                 },((ColorDrawable)sectorColourImage.getBackground()).getColor());
                 colourPickerDialog.show(fragment.getChildFragmentManager(),null);
-            }else if(v.getId()==R.id.startHourUpBtn){
+
+            }/* TIMER CLICKS */
+            else if(v.getId()==R.id.startHourUpBtn){
                 sector.setStartTime(sector.getStartTime()+60);
                 notifyItemChanged(getAdapterPosition());
             }else if(v.getId()==R.id.startHourDownBtn){
@@ -305,6 +332,21 @@ public class SectorsAdapter extends RecyclerView.Adapter {
                 sector.setEndTime(sector.getEndTime()-1);
                 notifyItemChanged(getAdapterPosition());
             }
+        }
+
+        @Override
+        public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+
+        }
+
+        @Override
+        public void onTextChanged(CharSequence s, int start, int before, int count) {
+
+        }
+
+        @Override
+        public void afterTextChanged(Editable s) {
+
         }
     }
 }

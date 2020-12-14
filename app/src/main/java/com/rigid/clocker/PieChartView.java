@@ -137,12 +137,14 @@ public class PieChartView extends View {
 
     private void init(Context context, AttributeSet attrs) {
         sharedPreferences = PreferenceManager.getDefaultSharedPreferences(context);
-        CLOCK_HOUR_MODE = Integer.parseInt(sharedPreferences.getString("clockmode","12"));
+        CLOCK_HOUR_MODE = Integer.parseInt(sharedPreferences.getString("clockmode","24"));
         TOTAL_SECONDS_IN_A_DAY=CLOCK_HOUR_MODE * 3600;
         hourGapAngle= getAngleForTimeInSeconds(60*60);
         calendar=Calendar.getInstance();
         sectors= new ArrayList<>();
-        //todo minimum total time = 5 mins
+        //if start<end either
+        // AM->PM OR PM->AM (12 HR MODE) OR
+        // PM -> AM (24 HR MODE)
         sectors.add(new Sector("Bla1",60,120,Color.RED));//1-2
         sectors.add(new Sector("Bla2",120,240,Color.BLUE));//2-4
         sectors.add(new Sector("Bla3",240,300,Color.GREEN));//4-5

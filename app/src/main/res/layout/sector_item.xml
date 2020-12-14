@@ -59,8 +59,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:alpha="0"
-        android:visibility="gone">
+        android:alpha="1"
+        android:visibility="visible">
         <LinearLayout
             android:layout_weight="1"
             android:layout_width="0dp"
@@ -75,16 +75,19 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"/>
             <RadioGroup
+                android:id="@+id/startTimerAmPmGroup"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:layout_gravity="center"
                 android:visibility="gone">
                 <RadioButton
+                    android:id="@+id/amRadioStart"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="AM"/>
                 <RadioButton
+                    android:id="@+id/pmRadioStart"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="PM"/>
@@ -104,16 +107,19 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"/>
             <RadioGroup
+                android:id="@+id/endTimerAmPmGroup"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:layout_gravity="center"
                 android:visibility="gone">
                 <RadioButton
+                    android:id="@+id/amRadioEnd"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="AM"/>
                 <RadioButton
+                    android:id="@+id/pmRadioEnd"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="PM"/>
