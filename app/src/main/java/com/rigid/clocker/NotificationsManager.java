@@ -27,6 +27,7 @@ public class NotificationsManager {
         this.context=context;
     }
     public void updateNotification(String... strings){
+        //show current sector (if any) and time left
         notificationManagerCompat.notify(NOTIFICATION_ID,createBuilder(context,strings));
     }
     private Notification createBuilder(Context context, String... strings){
