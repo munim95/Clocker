@@ -76,9 +76,9 @@ public class PieChartView extends View {
     private Paint paint;
     private Paint clockDetailsPaint;
 
-//    float curr_sector_angle = 0f;
-//    int curr_sector = 0;
-//    boolean chart_dirty = true;
+    float curr_sector_angle = 0f;
+    int curr_sector = 0;
+    boolean chart_dirty = true;
     private float sectorNumbersTextSize =40f,
             strokeWidthArc,
             clockTextSize; //default
@@ -118,13 +118,25 @@ public class PieChartView extends View {
     private ValueAnimator alphaValueAnimator;
     private Thread clockerTimeThread;
     private Calendar calendar;
-    private NotificationsManager notificationsManager;
+
+    private float outerToInnerGap,dateSize;
+    private Path timeCursor = new Path();
+    private float[] clockXy,weatherXy;
+    private String day,date;
+    private float diagLinePause;
+    private float maxDotRadius;
 
     /* Colours */
     int bgColour = Color.argb(getRGBAlpha(0.3f),255,255,255); //test colours--users default preferences go here
     int topColour = Color.BLACK;
-
     private boolean isEditing =false;
+
+    private boolean paused=false;
+    private Drawable pauseTimeDrawable;
+    private long pauseStartTime=-1;
+
+    private String hourText, minuteText;
+
 
     public PieChartView(Context context) {
         super(context);
@@ -157,7 +169,6 @@ public class PieChartView extends View {
         //todo upon user permission
 //        isPieFull();
 
-        notificationsManager= new NotificationsManager(context);
     }
     //returns total angle
     private void isPieFull(){
@@ -182,11 +193,10 @@ public class PieChartView extends View {
         }
     }
 
-    private String hourText, minuteText;
     //decided to make this public to use in both in widget provider and here
     public long updateTime(){
         /*TEST*/
-        elapsedTimeSeconds +=600;
+        elapsedTimeSeconds +=60;
         if(elapsedTimeSeconds >=CLOCK_HOUR_MODE*3600)
             elapsedTimeSeconds =0;
 
@@ -197,9 +207,6 @@ public class PieChartView extends View {
         minuteText = s[1] < 10 ? "0" + s[1] : s[1]+"";
         return elapsedTimeSeconds;
     }
-    private int[] t;
-    //get only the greatest time value
-    private String time;
     public void runClockThread() {
         if(clockEnabled) {
             if(clockerTimeThread ==null||!clockerTimeThread.isAlive()) {
@@ -207,15 +214,6 @@ public class PieChartView extends View {
                     while (true) {
                         updateTime();
                         postInvalidate();
-                        if(currSector!=null) {
-                            t = Helpers.timeConversion(elapsedTimeSeconds < currSector.getEndTime() * 60 ? currSector.getEndTime() * 60 - elapsedTimeSeconds :
-                                    currSector.getCorrectedEndTime(CLOCK_HOUR_MODE) * 60 - elapsedTimeSeconds);
-                            time = (t[0] != 0 ? t[1] != 0 ? "> " + t[0] + (t[0] != 1 ? " hrs" : " hr") : t[0] + (t[0] != 1 ? " hrs" : " hr") : "") +
-                                    (t[1] != 0 && t[0] == 0 ? (t[1] < 10 ? "0" + t[1] + (t[1] != 1 ? " mins" : " min") : t[1] + " mins") : "") +
-                                    (t[2] != 0 && t[1] == 0 && t[0] == 0 ? (t[2] < 10 ? "0" + t[2] + (t[2] != 1 ? " secs" : " sec") : t[2] + " secs") : "");
-                        }
-
-                        notificationsManager.updateNotification(currSector!=null?currSector.getName():"Idle",time);
                         try{
                             /* TEST - 1 ms*/
                             Thread.sleep(100); //call at intervals of one second
@@ -238,10 +236,7 @@ public class PieChartView extends View {
         return sinceMidnight / 1000;
     }
 
-    private float outerToInnerGap,dateSize;
-    private Path timeCursor = new Path();
-    private float[] clockXy,weatherXy;
-    private String day,date;
+
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
@@ -251,7 +246,7 @@ public class PieChartView extends View {
         float textAndStrokeSize = strokeWidthArc=(Math.round(0.01f*w));
         float rectRightBottom = Math.min(w,h)- textAndStrokeSize*2; //*2 to add some padding to the edges
         mainBGRectF = new RectF(textAndStrokeSize*2, textAndStrokeSize*2, rectRightBottom, rectRightBottom);
-        float radius=(mainBGRectF.width()/2f);
+        float radius=(mainBGRectF.width()*.5f);
         clockTextSize = 0.4f*radius; // to keep text in proportion
 
         paint = new Paint();
@@ -341,6 +336,9 @@ public class PieChartView extends View {
             }
         }
         timeCursor = Helpers.createPath(new Path(),3,strokeWidthArc,0,0);
+        diagLinePause = (float) (((Math.sqrt(Math.pow(getWidth(),2) + Math.pow(getHeight(),2)))*.5f)-(mainBGRectF.width()*.5f+strokeWidthArc))*.5f;
+        pauseTimeDrawable = getResources().getDrawable(R.drawable.ic_pause_circle_filled_black_24dp,null);
+        pauseTimeDrawable.setBounds((int)(getRight()-diagLinePause),0,(int)((getRight()-diagLinePause)+diagLinePause),(int)diagLinePause);
         /*
          * We moved all the elements that do not change after drawn from the onDraw here to avoid unnecessary draw calls
          * Sectors will only be drawn again in edit mode
@@ -350,7 +348,6 @@ public class PieChartView extends View {
     private float getArcLengthForTime(float radius, int seconds){
         return (float) (getAngleForTimeInSeconds(CLOCK_HOUR_MODE/12*seconds)/360f * (2*Math.PI*(radius)));
     }
-    private float maxDotRadius;
     private void initStaticChartElements(RectF rectF, ArrayList<Sector> sectors){
         Bitmap bitmap = Bitmap.createBitmap(getWidth(),getHeight(),Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bitmap);
@@ -510,7 +507,6 @@ public class PieChartView extends View {
         initStaticChartElements(mainBGRectF,sectors);
     }
     protected void onDraw(Canvas canvas) {
-//        canvas.clipPath(p, Region.Op.DIFFERENCE)
         makePie(canvas, mainBGRectF);
         super.onDraw(canvas);
     }
@@ -533,6 +529,7 @@ public class PieChartView extends View {
     //  doesn't happen when skipping every second normally
 //    private String nextSectorName;
     private void makePie(Canvas canvas, RectF bgRectF) {
+        pauseTimeDrawable.draw(canvas);
         canvas.save();
         canvas.rotate(CANVAS_ROTATION,bgRectF.centerX(),bgRectF.centerY()); // 0 degrees on top instead of at 90 degrees, for convenience
 
@@ -546,25 +543,30 @@ public class PieChartView extends View {
             paint.setStyle(Paint.Style.STROKE);
             paint.setStrokeWidth(strokeWidthArc);
             float currSectorStartAngle = getAngleForTimeInSeconds(currSector.getStartTime() * 60);
-            float sweepAngle = (currTimeAngle - currSectorStartAngle < 0 ? currTimeAngle + 360 : currTimeAngle) - currSectorStartAngle;
-//            if(paused){
-//                //add time paused
-//                elapsedTimeSeconds-= pauseStart;
-//                //check next available space enough to make up for the paused time after this sector
-//                //if there isnt any then notify the user and maybe ask if they want to make up for it at the cost of another sector time
-//                //the above should be points
-//
-//                //change this to something distinct from other sectors (NOT COLOURS but patterned)
-//                paint.setColor(Color.BLACK);
-//                paint.setAlpha(255);
-//                canvas.drawArc(bgRectF, currSectorStartAngle,
-//                        sweepAngle, false, paint);
-//            }else {
-//            }
+
             paint.setColor(currSector.getColour());
             paint.setAlpha(currSector.getColour() != -1 ? 255 : 0);
-            canvas.drawArc(bgRectF, currSectorStartAngle,
-                    sweepAngle, false, paint);
+            if(!paused)
+                canvas.drawArc(bgRectF, currSectorStartAngle,
+                        (currTimeAngle - currSectorStartAngle < 0 ? currTimeAngle + 360 : currTimeAngle) - currSectorStartAngle,
+                        false, paint);
+            else{
+                float pauseStartAngle = getAngleForTimeInSeconds(pauseStartTime);
+                //draw sector arc up to pause start angle
+                canvas.drawArc(bgRectF,currSectorStartAngle,
+                        (pauseStartAngle - currSectorStartAngle < 0 ? pauseStartAngle + 360 : pauseStartAngle) - currSectorStartAngle,
+                        false,paint);
+                //check next available space enough to make up for the paused time after this sector
+                //if there isnt any then notify the user and maybe ask if they want to make up for it at the cost of another sector time
+                //the above should be points
+
+                //change this to something distinct from other sectors (NOT COLOURS but patterned)
+                paint.setColor(Color.BLACK);
+                paint.setAlpha(255);
+                //draw paused arc
+                canvas.drawArc(bgRectF, pauseStartAngle,
+                        currTimeAngle-pauseStartAngle, false, paint);
+            }
 
         }
         //if editing then change only the selected sector state
@@ -587,8 +589,6 @@ public class PieChartView extends View {
         canvas.translate(xy[0],xy[1]);
         canvas.drawPath(timeCursor,paint);
         canvas.restore();
-
-
 
 //        canvas.clipOutRect(rectF);
 
@@ -732,6 +732,7 @@ public class PieChartView extends View {
         }
     }
     //todo look in to optimising touch event code further
+    private Sector lastSector=null;
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         if(!isEditSectorMode)
@@ -741,11 +742,35 @@ public class PieChartView extends View {
         float y = event.getY();
         switch(event.getAction()){
             case MotionEvent.ACTION_DOWN:
+                if(x>getRight()-diagLinePause && y<diagLinePause){
+                    //clicked on pause drawable
+                    if(!paused) {
+                        paused= true;
+                        pauseTimeDrawable = getResources().getDrawable(R.drawable.ic_play_circle_filled_black_24dp,null);
+                        if(currSector!=null){
+                            pauseStartTime=elapsedTimeSeconds;
+                        }else{
+                            if(lastSector!=null){
+                                int index = sectors.indexOf(lastSector);
+                                pauseStartTime=sectors.get(index!=sectors.size()-1?index+1:0).getStartTime()*60;
+                            }else{
+                                //first time
+                                pauseStartTime=sectors.get(0).getStartTime()*60;
+                            }
+                        }
+                    } else //resume
+                    {
+                        pauseTimeDrawable = getResources().getDrawable(R.drawable.ic_pause_circle_filled_black_24dp, null);
+                        paused= false;
+                    }
+                    pauseTimeDrawable.setBounds((int)(getRight()-diagLinePause),0,(int)((getRight()-diagLinePause)+diagLinePause),(int)diagLinePause);
+                    lastSector=currSector;
+                    invalidate();
+                    break;
+                }
                 selectedSector = findSectorForXY(x,y, sectors);
-                if(selectedSector==null)
-                    return false;
                 //ONLY IN EDIT MODE
-                if(isEditSectorMode) {
+                if(isEditSectorMode && selectedSector!=null) {
                     userStartAngle = cartesianToPolar(x, y)-CANVAS_ROTATION; //for +/- angles
                     userStartAngle=Math.min(360f,userStartAngle>360?userStartAngle-360:userStartAngle);
                     selectedSectorTotalAngle = getAngleForTimeInSeconds(selectedSector.getTotalTime(CLOCK_HOUR_MODE) * 60);
@@ -787,15 +812,13 @@ public class PieChartView extends View {
                 }
                 break;
             case MotionEvent.ACTION_MOVE:
-                if(selectedSector==null)
-                    return false;
                 //ONLY IN EDIT MODE
-                if(isEditSectorMode) {
+                if(isEditSectorMode && selectedSector!=null) {
                     //disable clock
                     if(!isEditing) {
+                        isEditing = true;
                         clockEnabled = false;
                         terminateClockerTimeThread();
-                        isEditing = true;
                     }
 
                     //suspend clock thread
@@ -999,12 +1022,17 @@ public class PieChartView extends View {
         }
     }
     private TextPaint sectorTextPaint;
-
     private void addSectorsDetailsText(Canvas c, Sector currSector, RectF rectF, Paint p, @ClockAlignment int alignment){
         float radiusOfHourDot = Math.round(outerToInnerGap/2f); //radius of the hour 'dot' (max radius)
         p.setTextSize(.06f*rectF.width());
         p.setColor(topColour);
-
+        int[] t = Helpers.timeConversion(elapsedTimeSeconds <currSector.getEndTime()*60?currSector.getEndTime()*60- elapsedTimeSeconds :
+                currSector.getCorrectedEndTime(CLOCK_HOUR_MODE)*60 - elapsedTimeSeconds);
+        //get only the greatest time value
+        String time =
+                (t[0]!=0?t[1]!=0?"> "+t[0]+(t[0]!=1?" hrs":" hr"):t[0]+(t[0]!=1?" hrs":" hr"):"")+
+                (t[1]!=0&&t[0]==0?(t[1]<10?"0"+t[1]+(t[1]!=1?" mins":" min"):t[1]+" mins"):"")+
+                (t[2]!=0&&t[1]==0&&t[0]==0?(t[2]<10?"0"+t[2]+(t[2]!=1?" secs":" sec"):t[2]+" secs"):"");
         //truncate curr sector text
         if(sectorTextPaint==null)
             sectorTextPaint=new TextPaint(p);
@@ -1014,9 +1042,9 @@ public class PieChartView extends View {
                 (rectF.width()*.7f)-(rectF.width()*.3f), //length of the divider line
                 TextUtils.TruncateAt.END).toString();
 
-//        float[] xy = polarToCartesian(rectF.centerX(),rectF.centerY(),
-//                (rectF.width()/2f)-(float) (getAngleForTimeInSeconds(CLOCK_HOUR_MODE/12*60*60)/360f * (2*Math.PI*(rectF.width()/2f))),
-//                90);
+        float[] xy = polarToCartesian(rectF.centerX(),rectF.centerY(),
+                (rectF.width()/2f)-(float) (getAngleForTimeInSeconds(CLOCK_HOUR_MODE/12*60*60)/360f * (2*Math.PI*(rectF.width()/2f))),
+                90);
         p.setStyle(Paint.Style.FILL);
         Rect rect = new Rect();
         p.getTextBounds(time,0,time.length(),rect);
@@ -1024,12 +1052,12 @@ public class PieChartView extends View {
             case ClockAlignment.TOP:
                 //bottom, left , right
                 /* Sector name */
-//                c.drawText(currSec, xy[0]-p.measureText(currSec)*.5f,
-//                        xy[1], p);
-//                /* remaining time */
-//                p.setTextSize(.04f*rectF.width());
-//                c.drawText(time, xy[0]-p.measureText(time)*.5f,
-//                        xy[1]+rect.height()+radiusOfHourDot, p);
+                c.drawText(currSec, xy[0]-p.measureText(currSec)*.5f,
+                        xy[1], p);
+                /* remaining time */
+                p.setTextSize(.04f*rectF.width());
+                c.drawText(time, xy[0]-p.measureText(time)*.5f,
+                        xy[1]+rect.height()+radiusOfHourDot, p);
                 break;
             case ClockAlignment.CENTER:
                 break;
