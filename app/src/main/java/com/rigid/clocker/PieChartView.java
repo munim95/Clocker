@@ -336,13 +336,15 @@ public class PieChartView extends View {
             }
         }
         timeCursor = Helpers.createPath(new Path(),3,strokeWidthArc,0,0);
+
+        //pause button
         diagLinePause = (float) (((Math.sqrt(Math.pow(getWidth(),2) + Math.pow(getHeight(),2)))*.5f)-(mainBGRectF.width()*.5f+strokeWidthArc))*.5f;
         pauseTimeDrawable = getResources().getDrawable(R.drawable.ic_pause_circle_filled_black_24dp,null);
         pauseTimeDrawable.setBounds((int)(getRight()-diagLinePause),0,(int)((getRight()-diagLinePause)+diagLinePause),(int)diagLinePause);
         /*
-         * We moved all the elements that do not change after drawn from the onDraw here to avoid unnecessary draw calls
+         * We moved all the elements that do not change after drawn from the onDraw here to avoid unnecessarily drawing things that do not change
          * Sectors will only be drawn again in edit mode
-         * */
+         */
         initStaticChartElements(mainBGRectF, sectors);
     }
     private float getArcLengthForTime(float radius, int seconds){
@@ -530,9 +532,9 @@ public class PieChartView extends View {
 //    private String nextSectorName;
     private void makePie(Canvas canvas, RectF bgRectF) {
         pauseTimeDrawable.draw(canvas);
+
         canvas.save();
         canvas.rotate(CANVAS_ROTATION,bgRectF.centerX(),bgRectF.centerY()); // 0 degrees on top instead of at 90 degrees, for convenience
-
         /*----SECTORS----*/
         float currTimeAngle = getAngleForTimeInSeconds((int) elapsedTimeSeconds);
         //determines what sector time is in
@@ -546,7 +548,7 @@ public class PieChartView extends View {
 
             paint.setColor(currSector.getColour());
             paint.setAlpha(currSector.getColour() != -1 ? 255 : 0);
-            if(!paused)
+            if(!paused)//normal
                 canvas.drawArc(bgRectF, currSectorStartAngle,
                         (currTimeAngle - currSectorStartAngle < 0 ? currTimeAngle + 360 : currTimeAngle) - currSectorStartAngle,
                         false, paint);
@@ -558,16 +560,13 @@ public class PieChartView extends View {
                         false,paint);
                 //check next available space enough to make up for the paused time after this sector
                 //if there isnt any then notify the user and maybe ask if they want to make up for it at the cost of another sector time
-                //the above should be points
 
-                //change this to something distinct from other sectors (NOT COLOURS but patterned)
                 paint.setColor(Color.BLACK);
                 paint.setAlpha(255);
                 //draw paused arc
                 canvas.drawArc(bgRectF, pauseStartAngle,
                         currTimeAngle-pauseStartAngle, false, paint);
             }
-
         }
         //if editing then change only the selected sector state
         if(isEditing){
@@ -735,39 +734,11 @@ public class PieChartView extends View {
     private Sector lastSector=null;
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        if(!isEditSectorMode)
-            return false;
         //handles selecting sectors and editing their values
         float x = event.getX();
         float y = event.getY();
         switch(event.getAction()){
             case MotionEvent.ACTION_DOWN:
-                if(x>getRight()-diagLinePause && y<diagLinePause){
-                    //clicked on pause drawable
-                    if(!paused) {
-                        paused= true;
-                        pauseTimeDrawable = getResources().getDrawable(R.drawable.ic_play_circle_filled_black_24dp,null);
-                        if(currSector!=null){
-                            pauseStartTime=elapsedTimeSeconds;
-                        }else{
-                            if(lastSector!=null){
-                                int index = sectors.indexOf(lastSector);
-                                pauseStartTime=sectors.get(index!=sectors.size()-1?index+1:0).getStartTime()*60;
-                            }else{
-                                //first time
-                                pauseStartTime=sectors.get(0).getStartTime()*60;
-                            }
-                        }
-                    } else //resume
-                    {
-                        pauseTimeDrawable = getResources().getDrawable(R.drawable.ic_pause_circle_filled_black_24dp, null);
-                        paused= false;
-                    }
-                    pauseTimeDrawable.setBounds((int)(getRight()-diagLinePause),0,(int)((getRight()-diagLinePause)+diagLinePause),(int)diagLinePause);
-                    lastSector=currSector;
-                    invalidate();
-                    break;
-                }
                 selectedSector = findSectorForXY(x,y, sectors);
                 //ONLY IN EDIT MODE
                 if(isEditSectorMode && selectedSector!=null) {
@@ -812,6 +783,7 @@ public class PieChartView extends View {
                 }
                 break;
             case MotionEvent.ACTION_MOVE:
+
                 //ONLY IN EDIT MODE
                 if(isEditSectorMode && selectedSector!=null) {
                     //disable clock
@@ -851,40 +823,8 @@ public class PieChartView extends View {
                             }
                         }
                     }
-                    //handle according to the changes in quadrant
-//                    if (set) {
-//                        if (switcher == -3) {
-//                            dAngle = (360 + userCurrAngle) - userStartAngle;
-//                        } else if (switcher == 3) {
-//                            dAngle = -((360 - userCurrAngle) + userStartAngle); //- since we are decreasing (anticlockwise)
-//                        }
-//                    }
-//                    float newAngle=(startBoundAngle !=-1? startBoundAngle : endBoundAngle) + dAngle;
-//                    newAngle=newAngle<0f?360f+newAngle:newAngle>360f?newAngle-360f:newAngle;
                     Sector affectedSector = sectors.get(affectedSector_index);
                     int newTime=getTimeForAngleInDegrees(Math.min(360, Math.max(0, userCurrAngle))) / 60;
-
-                    //Here we handled sectors limitations also handling cases where sector fell in the 'isNotNormal' state-
-                    // i.e either endTime < startTime OR affected sectors values differ from the selected sector(e.g should be <=selected sector values if start bound is changed).
-//                    boolean isNotNormal = startBoundAngle !=-1?
-//                            endTime < affectedSector.getStartTime():
-//                            startTime > affectedSector.getEndTime(); // for start bound selected sector normally should have values greater than its affected sector
-//                    long minEndTime = startBoundAngle !=-1?
-//                            isNotNormal && newTime > endTime ? endTime + (CLOCK_HOUR_MODE * 60) : endTime - MIN_SECTOR_TIME :
-//                            isNotNormal && newTime < startTime ? 0 : startTime + MIN_SECTOR_TIME;
-//                    boolean isPartNormal = startBoundAngle !=-1?
-//                            newTime < endTime && isNotNormal:
-//                            newTime > startTime && isNotNormal; //start time < end time as normal however still isNotNormal
-//                    boolean limiter = startBoundAngle !=-1?
-//                            newTime<=minEndTime && (isPartNormal? newTime<=(affectedSector.getColour()!=-1?affectedSector.getStartTime()+ MIN_SECTOR_TIME:affectedSector.getStartTime()) :
-//                                    newTime>=(affectedSector.getColour()!=-1?affectedSector.getStartTime()+ MIN_SECTOR_TIME:affectedSector.getStartTime())) :
-//                            newTime>=minEndTime && (isPartNormal? newTime>=(affectedSector.getColour()!=-1?affectedSector.getEndTime()- MIN_SECTOR_TIME:affectedSector.getEndTime()) :
-//                                    newTime<=(affectedSector.getColour()!=-1?affectedSector.getEndTime()- MIN_SECTOR_TIME:affectedSector.getEndTime()));
-//                    boolean limiter = startBoundAngle !=-1?
-//                            newTime<=minEndTime && (isPartNormal? newTime<=affectedSector.getEndTime() :
-//                                    newTime>=affectedSector.getEndTime()) :
-//                            newTime>=minEndTime && (isPartNormal? newTime>=affectedSector.getStartTime():
-//                                    newTime<=affectedSector.getStartTime());
 
                     if (startBoundAngle != -1) { //start time is being changed
                         //start>end - affected.end will always be lesser than start:
@@ -900,16 +840,11 @@ public class PieChartView extends View {
                         //here newtime is start time
 
                         //new time and set not in sync -- error occurs due to discrepancy in userCurrAngle and newAngle values
-                        Log.d(TAG,"NEW TIME "+newTime+" set "+set+" angle "+" "+userCurrAngle);
                         selectedSector.setStartTime(startTime>endTime?
                                 !set?Math.max(newTime,affectedSector.getEndTime()):Math.min(newTime,endTime-MIN_SECTOR_TIME):
                                 affectedSector.getEndTime()>startTime?
                                 !set?Math.min(Math.min(newTime,endTime-MIN_SECTOR_TIME),affectedSector.getEndTime()):Math.max(newTime,affectedSector.getEndTime()):
                                 Math.max(Math.min(newTime,endTime-MIN_SECTOR_TIME),affectedSector.getEndTime()));
-//                        if(limiter) {
-//                            selectedSector.setStartTime(newTime);
-////                            affectedSector.setEndTime(newTime); //prev sector
-//                        }
                     } else {
                         //here newtime is end time
                         //affected has to be bigger than selected
@@ -918,10 +853,6 @@ public class PieChartView extends View {
                                 affectedSector.getStartTime()<endTime?
                                         !set?Math.max(Math.max(newTime,startTime+MIN_SECTOR_TIME),affectedSector.getStartTime()):Math.min(newTime,affectedSector.getStartTime()):
                                         Math.min(Math.max(newTime,startTime+MIN_SECTOR_TIME),affectedSector.getStartTime()));
-//                        if(limiter) {
-//                            selectedSector.setEndTime(newTime);
-////                            affectedSector.setStartTime(newTime); //next sector
-//                        }
                     }// sector being changed
                     userStartQuadrant = getQuadrant(userCurrAngle);
                     if(alphaValueAnimator ==null) {
@@ -954,8 +885,34 @@ public class PieChartView extends View {
 
                 break;
             case MotionEvent.ACTION_UP:
-                if(selectedSector==null)
-                    return false;
+                if(x>getRight()-diagLinePause && y<diagLinePause){
+                    //clicked on pause drawable
+                    if(!paused) {
+                        paused= true;
+                        pauseTimeDrawable = getResources().getDrawable(R.drawable.ic_play_circle_filled_black_24dp,null);
+                        if(currSector!=null){
+                            pauseStartTime=elapsedTimeSeconds;
+                        }else{
+                            if(lastSector!=null){
+                                int index = sectors.indexOf(lastSector);
+                                pauseStartTime=sectors.get(index!=sectors.size()-1?index+1:0).getStartTime()*60;
+                            }else{
+                                //first time
+                                pauseStartTime=sectors.get(0).getStartTime()*60;
+                            }
+                        }
+                    } else //resume
+                    {
+                        paused= false;
+                        pauseTimeDrawable = getResources().getDrawable(R.drawable.ic_pause_circle_filled_black_24dp, null);
+                        //check for closest time slot available, if none available in the day ask user if they want to divide it in to other sectors or just one
+                        
+                    }
+                    pauseTimeDrawable.setBounds((int)(getRight()-diagLinePause),0,(int)((getRight()-diagLinePause)+diagLinePause),(int)diagLinePause);
+                    lastSector=currSector;
+                    invalidate();
+                    break;
+                }
                 if(isEditing) {
                     currSector=null;
                     clockEnabled=true;
@@ -1096,9 +1053,13 @@ public class PieChartView extends View {
     private void setSectorNumbersTextSize(float size){
         sectorNumbersTextSize =size;
     }
-
+    private boolean isOutsideCircle(float x, float y){
+        return Math.pow(x - getWidth()*.5f,2) + Math.pow(y - getWidth()*.5f,2) > Math.pow(getWidth()*.5f,2);
+    }
 
     private Sector findSectorForXY(float x, float y, ArrayList<Sector> data){
+        if(isOutsideCircle(x,y))
+            return null;
         //check the sector bounds the angle falls in
         Sector sector = null;
         for (int i=0; i<data.size() ; i++) {
