@@ -27,6 +27,7 @@ import android.view.View;
 import android.widget.Button;
 
 import androidx.annotation.IntDef;
+import androidx.core.content.res.ResourcesCompat;
 import androidx.palette.graphics.Palette;
 import androidx.preference.PreferenceManager;
 
@@ -34,6 +35,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -151,7 +153,7 @@ public class PieChartView extends View {
 
     private void init(Context context, AttributeSet attrs) {
         sharedPreferences = PreferenceManager.getDefaultSharedPreferences(context);
-        CLOCK_HOUR_MODE = Integer.parseInt(sharedPreferences.getString("clockmode","24"));
+        CLOCK_HOUR_MODE = Integer.parseInt(sharedPreferences.getString("clockmode","12"));
         TOTAL_SECONDS_IN_A_DAY=CLOCK_HOUR_MODE * 3600;
         hourGapAngle= getAngleForTimeInSeconds(60*60);
         calendar=Calendar.getInstance();
@@ -688,6 +690,11 @@ public class PieChartView extends View {
     }
     private void findSectorForAngle(float sweep_time_angle){
         if(currSector==null) {
+            int index = lastSector!=null?sectors.indexOf(lastSector)+1:0;
+            if (sweep_time_angle < getAngleForTimeInSeconds(sectors.get(index < sectors.size() ? index : 0).getStartTime() * 60)) {
+                return;
+            }
+            updatePauseTime(paused);
             for(Sector s:sectors){
                 float sAngle = getAngleForTimeInSeconds(s.getStartTime()*60);
                 float eAngle = getAngleForTimeInSeconds(s.getEndTime() * 60);
@@ -717,7 +724,8 @@ public class PieChartView extends View {
             if (!checkCurrentSector && sweep_time_angle < currentSectorEndAngle)
                 checkCurrentSector = true;
             if (checkCurrentSector) {
-                if (sweep_time_angle >= currentSectorEndAngle) {
+                if (sweep_time_angle >= currentSectorEndAngle ) {
+                    lastSector=currSector;
                     currSector = null;
                     checkCurrentSector =false;
                 }
@@ -732,6 +740,7 @@ public class PieChartView extends View {
     }
     //todo look in to optimising touch event code further
     private Sector lastSector=null;
+    private List<Sector> pausedSectors;
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         //handles selecting sectors and editing their values
@@ -889,30 +898,20 @@ public class PieChartView extends View {
                     //clicked on pause drawable
                     if(!paused) {
                         paused= true;
-                        pauseTimeDrawable = getResources().getDrawable(R.drawable.ic_play_circle_filled_black_24dp,null);
-                        if(currSector!=null){
-                            pauseStartTime=elapsedTimeSeconds;
-                        }else{
-                            if(lastSector!=null){
-                                int index = sectors.indexOf(lastSector);
-                                pauseStartTime=sectors.get(index!=sectors.size()-1?index+1:0).getStartTime()*60;
-                            }else{
-                                //first time
-                                pauseStartTime=sectors.get(0).getStartTime()*60;
-                            }
-                        }
+                        pauseTimeDrawable = ResourcesCompat.getDrawable(getResources(),R.drawable.ic_play_circle_filled_black_24dp,null);
+
                     } else //resume
                     {
                         paused= false;
-                        pauseTimeDrawable = getResources().getDrawable(R.drawable.ic_pause_circle_filled_black_24dp, null);
+                        pauseTimeDrawable = ResourcesCompat.getDrawable(getResources(),R.drawable.ic_pause_circle_filled_black_24dp, null);
                         //check for closest time slot available, if none available in the day ask user if they want to divide it in to other sectors or just one
                         
                     }
                     pauseTimeDrawable.setBounds((int)(getRight()-diagLinePause),0,(int)((getRight()-diagLinePause)+diagLinePause),(int)diagLinePause);
-                    lastSector=currSector;
+//                    lastSector=currSector;
                     invalidate();
-                    break;
                 }
+                updatePauseTime(paused);
                 if(isEditing) {
                     currSector=null;
                     clockEnabled=true;
@@ -931,6 +930,22 @@ public class PieChartView extends View {
                 break;
         }
         return true;
+    }
+    private void updatePauseTime(boolean paused){
+        if(paused){
+            if(currSector!=null){
+                pauseStartTime=elapsedTimeSeconds;
+
+            }else{
+                if(lastSector!=null){
+                    int index = sectors.indexOf(lastSector);
+                    pauseStartTime=sectors.get(index!=sectors.size()-1?index+1:0).getStartTime()*60;
+                }else{
+                    //first time
+                    pauseStartTime=sectors.get(0).getStartTime()*60;
+                }
+            }
+        }
     }
     // spans the text over the desired width
     private float getMaxTextSizeForWidth(Paint paint, float desiredWidth,
